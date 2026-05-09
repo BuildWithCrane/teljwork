@@ -240,20 +240,30 @@
         }
 
         async function downloadFile(fileId, name) {
-            showNotify("Fetching secure key...");
-            try {
-                const res = await fetch(`${WORKER_URL}/files/download?fileId=${fileId}`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                const data = await res.json();
-                if (data.ok && data.url) {
-                    const a = document.createElement('a');
-                    a.href = data.url;
-                    a.download = name;
-                    a.click();
-                } else { showNotify("Access denied", "error"); }
-            } catch (e) { showNotify("Download failed", "error"); }
+    showNotify("Fetching secure key...");
+    try {
+        // We use encodeURIComponent here so the long ID doesn't break the URL
+        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        const data = await res.json();
+        
+        if (data.ok && data.url) {
+            const a = document.createElement('a');
+            a.href = data.url;
+            a.download = name;
+            document.body.appendChild(a); // Required for some browsers
+            a.click();
+            a.remove();
+        } else { 
+            // This will now show you the ACTUAL error from the worker
+            showNotify(data.error || "Access denied", "error"); 
         }
+    } catch (e) { 
+        showNotify("Download failed", "error"); 
+    }
+}
 
         async function deleteFile(id) {
             if(!confirm("Destroy this file permanently?")) return;
