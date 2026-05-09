@@ -33,7 +33,6 @@
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
         .user-badge { display: flex; align-items: center; gap: 12px; background: var(--surface); padding: 8px 16px; border-radius: 100px; border: 1px solid var(--border); font-size: 0.85rem; }
         
-        /* Grid & Cards */
         .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; }
         .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
@@ -52,12 +51,12 @@
         .file-table { width: 100%; border-collapse: collapse; }
         .file-table th { text-align: left; font-size: 0.75rem; color: var(--text-muted); padding: 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; }
         .file-table td { padding: 16px 12px; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
-        .file-icon { color: var(--primary); margin-right: 10px; }
-        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: 0.2s; padding: 5px; }
+        .file-icon { color: var(--primary); margin-right: 10px; width: 20px; text-align: center; }
+        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: 0.2s; padding: 5px; font-size: 1.1rem; }
         .action-btn:hover { color: var(--primary); }
         .action-btn.delete:hover { color: var(--error); }
 
-        /* Custom Notification Toast */
+        /* Toast Notification */
         #toast {
             position: fixed; bottom: 30px; right: 30px; 
             padding: 16px 24px; border-radius: 16px; 
@@ -124,8 +123,8 @@
                 
                 <div class="card">
                     <span class="nav-label">Referral Link</span>
-                    <div class="mono" id="ref-link" style="background: var(--bg); padding: 12px; border-radius: 8px; font-size: 0.8rem; margin: 10px 0; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis;">...</div>
-                    <p style="font-size: 0.75rem; color: var(--text-muted);">Share this to gain 5GB per sign-up.</p>
+                    <div class="mono" id="ref-link" onclick="copyRef()" style="background: var(--bg); padding: 12px; border-radius: 8px; font-size: 0.75rem; margin: 10px 0; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; cursor: pointer;">...</div>
+                    <p style="font-size: 0.7rem; color: var(--text-muted);"><i class="far fa-copy"></i> Click the box above to copy your invite link.</p>
                 </div>
             </div>
         </div>
@@ -137,22 +136,32 @@
     </div>
 
     <script>
-        const WORKER_URL = "https://sparkling-math-0017.wgattr14.workers.dev";
+        // --- 1. AUTH GUARD ---
         const token = localStorage.getItem('jwork_token');
-
         if (!token) window.location.href = '../auth';
+
+        const WORKER_URL = "https://sparkling-math-0017.wgattr14.workers.dev";
 
         function showNotify(msg, type = 'info') {
             const t = document.getElementById('toast');
             const icon = document.getElementById('toast-type');
             document.getElementById('toast-msg').innerText = msg;
-            
             icon.style.background = type === 'error' ? 'var(--error)' : 'var(--primary)';
             icon.innerHTML = type === 'error' ? '<i class="fas fa-times"></i>' : '<i class="fas fa-check"></i>';
-            
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 4000);
         }
+
+        // --- 2. ICON LOGIC ---
+        const getIcon = (name) => {
+            const ext = name.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return 'fa-file-image';
+            if (['pdf'].includes(ext)) return 'fa-file-pdf';
+            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'fa-file-archive';
+            if (['mp4', 'mov', 'avi'].includes(ext)) return 'fa-file-video';
+            if (['mp3', 'wav'].includes(ext)) return 'fa-file-audio';
+            return 'fa-file-alt';
+        };
 
         async function refreshDash() {
             try {
@@ -168,7 +177,8 @@
                 if (!user.ok) return logout();
 
                 document.getElementById('user-display').innerText = user.username;
-                document.getElementById('ref-link').innerText = `${window.location.origin}/auth?ref=${user.referral_code}`;
+                // Update referral link based on current domain
+                document.getElementById('ref-link').innerText = `${window.location.origin}/index.html?ref=${user.referral_code}`;
                 
                 const percent = Math.round((user.storage_used / user.storage_cap) * 100);
                 document.getElementById('percent-label').innerText = percent + '%';
@@ -176,17 +186,27 @@
                 document.getElementById('raw-storage-label').innerText = `${(user.storage_used/1024**3).toFixed(2)}GB / ${(user.storage_cap/1024**3).toFixed(2)}GB`;
 
                 const list = document.getElementById('file-list');
+                
+                // --- 3. EMPTY STATE CHECK ---
+                if (!filesData.files || filesData.files.length === 0) {
+                    list.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 60px; color: var(--text-muted);">
+                        <i class="fas fa-folder-open" style="display:block; font-size: 2.5rem; margin-bottom: 15px; opacity: 0.3;"></i>
+                        <p>No files found in your vault.</p>
+                    </td></tr>`;
+                    return;
+                }
+
                 list.innerHTML = filesData.files.map(f => `
                     <tr>
-                        <td><i class="far fa-file-alt file-icon"></i> ${f.name}</td>
+                        <td><i class="far ${getIcon(f.name)} file-icon"></i> ${f.name}</td>
                         <td class="mono" style="font-size: 0.8rem;">${(f.size/1024/1024).toFixed(1)} MB</td>
                         <td>
-                            <button class="action-btn" onclick="downloadFile('${f.file_id}', '${f.name}')"><i class="fas fa-cloud-download-alt"></i></button>
-                            <button class="action-btn delete" onclick="deleteFile('${f.id}')"><i class="fas fa-trash-alt"></i></button>
+                            <button class="action-btn" onclick="downloadFile('${f.file_id}', '${f.name}')" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
+                            <button class="action-btn delete" onclick="deleteFile('${f.id}')" title="Delete"><i class="fas fa-trash-alt"></i></button>
                         </td>
                     </tr>
                 `).join('');
-            } catch(e) { showNotify("Connection lost", "error"); }
+            } catch(e) { showNotify("Connection failed", "error"); }
         }
 
         async function triggerUpload() {
@@ -195,7 +215,7 @@
             input.onchange = async () => {
                 const file = input.files[0];
                 if (file.size > 50 * 1024 * 1024) {
-                    return showNotify("File exceeds 50MB security limit", "error");
+                    return showNotify("File exceeds 50MB limit", "error");
                 }
 
                 showNotify("Encrypting & Uploading...");
@@ -210,7 +230,7 @@
                     });
                     const data = await res.json();
                     if (data.ok) {
-                        showNotify("File stored successfully");
+                        showNotify("Success: File stored in vault");
                         refreshDash();
                     } else { showNotify(data.error, "error"); }
                 } catch (e) { showNotify("Upload failed", "error"); }
@@ -219,7 +239,7 @@
         }
 
         async function downloadFile(fileId, name) {
-            showNotify("Requesting secure link...");
+            showNotify("Fetching secure key...");
             try {
                 const res = await fetch(`${WORKER_URL}/files/download?fileId=${fileId}`, {
                     headers: { 'Authorization': 'Bearer ' + token }
@@ -230,7 +250,7 @@
                     a.href = data.url;
                     a.download = name;
                     a.click();
-                } else { showNotify("Vault access denied", "error"); }
+                } else { showNotify("Access denied", "error"); }
             } catch (e) { showNotify("Download failed", "error"); }
         }
 
@@ -244,7 +264,15 @@
             refreshDash();
         }
 
-        function logout() { localStorage.removeItem('jwork_token'); window.location.href = 'index.html'; }
+        // --- 4. COPY REFERRAL LOGIC ---
+        function copyRef() {
+            const link = document.getElementById('ref-link').innerText;
+            navigator.clipboard.writeText(link).then(() => {
+                showNotify("Link copied to clipboard!");
+            });
+        }
+
+        function logout() { localStorage.removeItem('jwork_token'); window.location.href = '../auth'; }
         refreshDash();
     </script>
 </body>
