@@ -118,7 +118,7 @@
                     msgDiv.className = "success";
                     msgDiv.innerText = "Success! Redirecting...";
                     localStorage.setItem('jwork_token', data.token);
-                    setTimeout(() => window.location.href = './dash', 800);
+                    setTimeout(() => window.location.href = '../dash', 800);
                 } else {
                     msgDiv.className = "error";
                     msgDiv.innerText = data.error;
