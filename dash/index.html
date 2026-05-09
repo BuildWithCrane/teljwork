@@ -140,7 +140,7 @@
         const WORKER_URL = "https://sparkling-math-0017.wgattr14.workers.dev";
         const token = localStorage.getItem('jwork_token');
 
-        if (!token) window.location.href = 'index.html';
+        if (!token) window.location.href = '../auth';
 
         function showNotify(msg, type = 'info') {
             const t = document.getElementById('toast');
