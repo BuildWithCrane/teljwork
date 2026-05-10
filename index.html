@@ -263,7 +263,7 @@
             <div class="nav-links">
                 <a href="#features">About</a>
                 <a href="#features">Security</a>
-                <a href="https://storage.jwork.ru/dash" class="btn btn-login">Get Started</a>
+                <a href="https://storage.jwork.ru/auth" class="btn btn-login" data-auth-link>Get Started</a>
             </div>
         </div>
     </nav>
@@ -307,7 +307,7 @@
                         </div>
                     </div>
 
-                    <a href="https://storage.jwork.ru/dash" class="btn btn-primary">Claim Your Vault</a>
+                    <a href="https://storage.jwork.ru/auth" class="btn btn-primary" data-auth-link>Claim Your Vault</a>
                     <div class="referral-note">
                         <i class="fas fa-info-circle"></i> Max referral capacity: 100GB
                     </div>
@@ -347,5 +347,27 @@
         </div>
     </footer>
 
+    <script>
+        (async function () {
+            const API_BASE = "https://sparkling-math-0017.wgattr14.workers.dev";
+            const params = new URLSearchParams(window.location.search);
+            const ref = (params.get('ref') || '').trim().toUpperCase();
+            if (ref && !/^[A-Z0-9-]{4,32}$/.test(ref)) return;
+            if (!ref) return;
+
+            localStorage.setItem('jwork_pending_ref', ref);
+            document.querySelectorAll('[data-auth-link]').forEach((link) => {
+                link.href = `https://storage.jwork.ru/auth?ref=${encodeURIComponent(ref)}`;
+            });
+
+            try {
+                await fetch(`${API_BASE}/referrals/track-click`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ referral_code: ref })
+                });
+            } catch (_) {}
+        })();
+    </script>
 </body>
 </html>
