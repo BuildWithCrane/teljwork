@@ -6,17 +6,8 @@ const CORS_HEADERS = {
 };
 
 const GB = 1073741824;
-const BASE_STORAGE = 10 * GB;
-const PARTNER_BONUS_STORAGE = 25 * GB;
-const REFERRAL_BONUS = 5 * GB;
-const MAX_STORAGE = 100 * GB;
+const BASE_STORAGE = 100 * GB;
 const FILE_LIMIT = 20 * 1024 * 1024;
-const MAX_ACCOUNTS_PER_IP = 3;
-const MAX_DATACENTER_REFERRALS = 5;
-const PARTNER_CODES = ['MIGDNS25'];
-const REFERRAL_SAME_IP_COOLDOWN_HOURS = 24;
-const HOUR_MS = 3600 * 1000;
-const REFERRAL_MILESTONES = [1, 3, 5, 10, 15, 20];
 
 export default {
   async fetch(request, env) {
@@ -32,11 +23,6 @@ export default {
       if (pathname === '/files/download' && request.method === 'GET') return downloadFile(request, env);
       if (pathname === '/files/delete' && request.method === 'POST') return deleteFile(request, env);
 
-      if (pathname === '/referrals/track-click' && request.method === 'POST') return trackReferralClick(request, env);
-      if (pathname === '/referrals/summary' && request.method === 'GET') return getReferralSummary(request, env);
-      if (pathname === '/referrals/history' && request.method === 'GET') return getReferralHistory(request, env);
-      if (pathname === '/referrals/milestones' && request.method === 'GET') return getReferralMilestones(request, env);
-
       return jsonError('Not found', 404, 'not_found');
     } catch (err) {
       return jsonError(`Server error: ${err.message}`, 500, 'server_error');
@@ -44,141 +30,44 @@ export default {
   }
 };
 
-async function isDatacenterIP(ip) {
-  try {
-    const res = await fetch(`http://ip-api.com/json/${ip}?fields=hosting`, { cf: { cacheTtl: 86400 } });
-    const data = await res.json();
-    return data.hosting === true;
-  } catch {
-    return false;
-  }
-}
-
 async function register(request, env) {
   const body = await request.json().catch(() => ({}));
-  const username = String(body.username || '').trim();
+  const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
-  const referral_code = String(body.referral_code || '').trim();
 
-  if (!username || !password) return jsonError('Username and password are required', 400, 'invalid_input');
-  if (!/^[a-zA-Z0-9_]{3,32}$/.test(username)) return jsonError('Username must be 3-32 chars: letters, numbers, underscore', 400, 'invalid_username');
+  if (!email || !password) return jsonError('Email and password are required', 400, 'invalid_input');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Invalid email address', 400, 'invalid_email');
   if (password.length < 8) return jsonError('Password must be at least 8 characters', 400, 'invalid_password');
 
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const userAgent = request.headers.get('User-Agent') || 'unknown';
-  const userAgentHash = await hashText(userAgent);
-
-  const [ipAccounts, isHosting] = await Promise.all([
-    ip !== 'unknown' ? sbGet(env, `users?signup_ip=eq.${enc(ip)}&select=id`) : Promise.resolve([]),
-    ip !== 'unknown' ? isDatacenterIP(ip) : Promise.resolve(false),
-  ]);
-
-  if (ipAccounts.length >= MAX_ACCOUNTS_PER_IP) return jsonError('Account limit reached', 429, 'account_limit_reached');
-
-  const existing = await sbGet(env, `users?username=eq.${enc(username)}&select=id`);
-  if (existing.length > 0) return jsonError('Username taken', 409, 'username_taken');
+  const existing = await sbGet(env, `users?email=eq.${enc(email)}&select=id`);
+  if (existing.length > 0) return jsonError('Email already registered', 409, 'email_taken');
 
   const passwordHash = await hashPassword(password);
-  const myCode = generateCode();
-  const upReferral = referral_code.toUpperCase();
-  const startingCap = PARTNER_CODES.includes(upReferral) ? PARTNER_BONUS_STORAGE : BASE_STORAGE;
-
-  let referredBy = null;
-  let grantReferralBonus = true;
-  let referralReason = 'qualified';
-
-  if (referral_code) {
-    const referrers = await sbGet(env, `users?referral_code=eq.${enc(upReferral)}&select=id,flagged,signup_ip,signup_ip_datacenter,storage_cap,referral_count`);
-    if (referrers.length === 0) {
-      return jsonError('Referral code not found', 400, 'invalid_referral_code');
-    }
-
-    const referrer = referrers[0];
-    referredBy = referrer.id;
-
-    const abuseReasons = [];
-    if (referrer.flagged) abuseReasons.push('referrer_flagged');
-    if (referrer.signup_ip && ip !== 'unknown' && referrer.signup_ip === ip) abuseReasons.push('same_ip');
-    if (isHosting && referrer.signup_ip_datacenter) abuseReasons.push('datacenter_pair');
-
-    const refHash = await readOptionalKV(env, `uafp:${referrer.id}`);
-    if (refHash && refHash === userAgentHash) abuseReasons.push('same_device_fingerprint');
-
-    if (ip !== 'unknown') {
-      const cutoff = new Date(Date.now() - REFERRAL_SAME_IP_COOLDOWN_HOURS * HOUR_MS).toISOString();
-      const sameIpRecent = await sbGet(env, `users?referred_by=eq.${referrer.id}&signup_ip=eq.${enc(ip)}&created_at=gte.${enc(cutoff)}&select=id`);
-      if (sameIpRecent.length > 0) abuseReasons.push('same_ip_cooldown');
-    }
-
-    const datacenterReferrals = await sbGet(env, `users?referred_by=eq.${referrer.id}&signup_ip_datacenter=eq.true&select=id`);
-    if (isHosting && datacenterReferrals.length >= MAX_DATACENTER_REFERRALS) abuseReasons.push('datacenter_referral_limit');
-
-    if ((referrer.storage_cap || 0) >= MAX_STORAGE) abuseReasons.push('storage_cap_reached');
-
-    if (abuseReasons.length > 0) {
-      grantReferralBonus = false;
-      referralReason = abuseReasons.join(',');
-    }
-  }
 
   const created = await sbPost(env, 'users', {
-    username,
+    email,
     password_hash: passwordHash,
-    referral_code: myCode,
-    referred_by: referredBy,
     storage_used: 0,
-    storage_cap: startingCap,
-    signup_ip: ip,
-    signup_ip_datacenter: isHosting,
+    storage_cap: BASE_STORAGE,
   });
 
   if (!created?.length) return jsonError('Account creation failed', 500, 'account_creation_failed');
   const user = created[0];
 
-  await writeOptionalKV(env, `uafp:${user.id}`, userAgentHash);
-
-  if (referredBy && grantReferralBonus) {
-    const referrers = await sbGet(env, `users?id=eq.${referredBy}&select=storage_cap,referral_count`);
-    if (referrers.length > 0) {
-      const ref = referrers[0];
-      await sbPatch(env, `users?id=eq.${referredBy}`, {
-        storage_cap: Math.min(Number(ref.storage_cap || 0) + REFERRAL_BONUS, MAX_STORAGE),
-        referral_count: (ref.referral_count || 0) + 1,
-      });
-    }
-  }
-
-  if (referredBy) {
-    await writeOptionalKV(env, `refr:${user.id}`, JSON.stringify({
-      qualified: grantReferralBonus,
-      reason: referralReason,
-      bonus_bytes: grantReferralBonus ? REFERRAL_BONUS : 0,
-      created_at: new Date().toISOString(),
-    }));
-  }
-
-  const token = await makeJWT({ userId: user.id, username: user.username }, env.JWT_SECRET);
-  return jsonOk({
-    token,
-    username: user.username,
-    referral_code: myCode,
-    referral: {
-      applied: Boolean(referredBy),
-      qualified: grantReferralBonus,
-      reason: referralReason,
-    }
-  });
+  const token = await makeJWT({ userId: user.id, email: user.email }, env.JWT_SECRET);
+  return jsonOk({ token, email: user.email });
 }
 
 async function login(request, env) {
-  const { username = '', password = '' } = await request.json().catch(() => ({}));
-  const users = await sbGet(env, `users?username=eq.${enc(username)}&select=*`);
+  const { email = '', password = '' } = await request.json().catch(() => ({}));
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const users = await sbGet(env, `users?email=eq.${enc(normalizedEmail)}&select=*`);
   if (!users.length || !(await verifyPassword(password, users[0].password_hash))) {
     return jsonError('Invalid credentials', 401, 'invalid_credentials');
   }
   const user = users[0];
-  const token = await makeJWT({ userId: user.id, username: user.username }, env.JWT_SECRET);
-  return jsonOk({ token, username: user.username, storage_used: user.storage_used, storage_cap: user.storage_cap, referral_code: user.referral_code });
+  const token = await makeJWT({ userId: user.id, email: user.email }, env.JWT_SECRET);
+  return jsonOk({ token, email: user.email, storage_used: user.storage_used, storage_cap: user.storage_cap });
 }
 
 async function getMe(request, env) {
@@ -203,7 +92,7 @@ async function uploadFile(request, env) {
 
   const tgForm = new FormData();
   tgForm.append('chat_id', env.CHAT_ID);
-  tgForm.append('caption', `👤 ${auth.username}\n📁 ${file.name}`);
+  tgForm.append('caption', `👤 ${auth.email}\n📁 ${file.name}`);
 
   let method = 'sendDocument';
   const type = file.type || '';
@@ -289,89 +178,6 @@ async function deleteFile(request, env) {
   return jsonOk({ deleted: true });
 }
 
-async function trackReferralClick(request, env) {
-  const { referral_code = '' } = await request.json().catch(() => ({}));
-  const code = String(referral_code || '').trim().toUpperCase();
-  if (!code) return jsonError('referral_code required', 400, 'missing_referral_code');
-
-  const refs = await sbGet(env, `users?referral_code=eq.${enc(code)}&select=id`);
-  if (refs.length === 0) return jsonError('Invalid referral code', 400, 'invalid_referral_code');
-
-  await incrementOptionalKV(env, `refclick:${code}`);
-  await incrementOptionalKV(env, 'refclick:total');
-
-  return jsonOk({ tracked: true });
-}
-
-async function getReferralSummary(request, env) {
-  const auth = await requireAuth(request, env);
-  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-
-  const users = await sbGet(env, `users?id=eq.${auth.userId}&select=id,referral_code,referral_count,storage_cap`);
-  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
-  const user = users[0];
-
-  const referred = await sbGet(env, `users?referred_by=eq.${auth.userId}&select=id`);
-  const qualified = Number(user.referral_count || 0);
-  const currentCap = Number(user.storage_cap || BASE_STORAGE);
-  const inferredStartCap = Math.max(BASE_STORAGE, Math.min(PARTNER_BONUS_STORAGE, currentCap - qualified * REFERRAL_BONUS));
-  const earnedBytes = Math.max(0, Math.min(currentCap - inferredStartCap, qualified * REFERRAL_BONUS));
-  const clicks = Number(await readOptionalKV(env, `refclick:${user.referral_code}`) || 0);
-
-  return jsonOk({
-    referral_code: user.referral_code,
-    qualified_referrals: qualified,
-    total_signups: referred.length,
-    earned_storage_gb: earnedBytes / GB,
-    current_storage_cap_gb: Number(user.storage_cap || 0) / GB,
-    max_storage_gb: MAX_STORAGE / GB,
-    remaining_to_max_gb: Math.max(0, MAX_STORAGE - Number(user.storage_cap || 0)) / GB,
-    referral_clicks: clicks,
-  });
-}
-
-async function getReferralHistory(request, env) {
-  const auth = await requireAuth(request, env);
-  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-
-  const rows = await sbGet(env, `users?referred_by=eq.${auth.userId}&order=created_at.desc&select=id,username,created_at`);
-  const history = [];
-
-  for (const row of rows) {
-    const metaRaw = await readOptionalKV(env, `refr:${row.id}`);
-    const meta = safeJson(metaRaw);
-    history.push({
-      id: row.id,
-      username: row.username,
-      created_at: row.created_at,
-      qualified: Boolean(meta?.qualified),
-      reason: meta?.reason || (metaRaw ? 'unknown' : 'legacy_record'),
-      bonus_gb: Number(meta?.bonus_bytes || 0) / GB,
-    });
-  }
-
-  return jsonOk({ history });
-}
-
-async function getReferralMilestones(request, env) {
-  const auth = await requireAuth(request, env);
-  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-
-  const users = await sbGet(env, `users?id=eq.${auth.userId}&select=referral_count`);
-  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
-
-  const count = Number(users[0].referral_count || 0);
-  return jsonOk({ milestones: buildReferralMilestones(count) });
-}
-
-function buildReferralMilestones(count) {
-  return REFERRAL_MILESTONES.map((required) => ({
-    required_referrals: required,
-    reached: count >= required,
-    bonus_gb: (required * REFERRAL_BONUS) / GB,
-  }));
-}
-
 const sbHeaders = (env) => ({
   apikey: env.SUPABASE_KEY,
   Authorization: `Bearer ${env.SUPABASE_KEY}`,
@@ -455,38 +261,12 @@ async function verifyPassword(password, stored) {
   return check === hashHex;
 }
 
-async function hashText(input) {
-  const data = new TextEncoder().encode(String(input || ''));
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function incrementOptionalKV(env, key) {
-  if (!env.REFERRAL_KV) return;
-  const cur = Number((await env.REFERRAL_KV.get(key)) || 0);
-  await env.REFERRAL_KV.put(key, String(cur + 1));
-}
-
-async function readOptionalKV(env, key) {
-  if (!env.REFERRAL_KV) return null;
-  return env.REFERRAL_KV.get(key);
-}
-
-async function writeOptionalKV(env, key, value) {
-  if (!env.REFERRAL_KV) return;
-  await env.REFERRAL_KV.put(key, String(value));
-}
-
 function safeJson(value) {
   try {
     return JSON.parse(value);
   } catch {
     return null;
   }
-}
-
-function generateCode() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
 function enc(s) {
@@ -508,7 +288,6 @@ function jsonError(message, status = 400, code = 'bad_request') {
 }
 
 export const __testables = {
-  buildReferralMilestones,
   enc,
   safeJson,
 };

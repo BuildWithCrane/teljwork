@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jwork | Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <title>Everfast | Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     :root {
-      --bg:#050505;--surface:#0f0f0f;--surface-accent:#161616;--border:rgba(255,255,255,.08);
-      --primary:#5200ff;--text:#fff;--muted:#b8b8b8;--error:#ff4b4b;--success:#00ff85;--sidebar:260px;
+      --bg:#020617;--surface:#0f172a;--surface-accent:#1e293b;--border:rgba(255,255,255,.06);
+      --primary:#3b82f6;--text:#fff;--muted:#94a3b8;--error:#f87171;--success:#34d399;--sidebar:260px;
     }
-    *{box-sizing:border-box;margin:0;padding:0;font-family:'Plus Jakarta Sans',sans-serif}
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
     body{background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
     .mono{font-family:'JetBrains Mono',monospace}
     .sidebar{width:var(--sidebar);background:var(--surface);padding:24px;border-right:1px solid var(--border);display:flex;flex-direction:column}
-    .logo{font-weight:800;color:#fff;text-decoration:none;display:flex;gap:10px;align-items:center;margin-bottom:34px}
-    .logo i{color:var(--primary)}
-    .nav-label{font-size:.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;display:block}
-    .nav-link{display:flex;gap:12px;align-items:center;padding:12px;color:var(--muted);text-decoration:none;border-radius:12px;font-weight:600;font-size:.92rem}
+    .logo{font-weight:900;color:#fff;text-decoration:none;display:flex;gap:8px;align-items:center;margin-bottom:34px;font-size:1.2rem;letter-spacing:-0.5px}
+    .logo span{color:var(--primary)}
+    .nav-label{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:20px 0 10px;display:block}
+    .nav-link{display:flex;gap:12px;align-items:center;padding:12px;color:var(--muted);text-decoration:none;border-radius:12px;font-weight:600;font-size:.9rem}
     .nav-link:hover,.nav-link.active{background:var(--surface-accent);color:#fff}
     .main{flex:1;overflow:auto;padding:36px}
     .top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:22px}
@@ -27,7 +27,7 @@
     .card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:18px}
     .span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-12{grid-column:span 12}.span-6{grid-column:span 6}
     .small{color:var(--muted);font-size:.82rem}
-    .btn{border:none;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    .btn{border:none;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem}
     .btn-primary{background:var(--primary);color:#fff}
     .btn-ghost{background:transparent;border:1px solid var(--border);color:#fff}
     .btn-danger{background:var(--error);color:#fff}
@@ -46,18 +46,17 @@
     #toast.show{transform:translateY(0)}
     .pagination{display:flex;gap:8px;justify-content:flex-end;padding-top:12px}
     .empty{padding:36px;text-align:center;color:var(--muted)}
-    .danger{border-color:rgba(255,75,75,.5)}
+    .danger{border-color:rgba(248,113,113,.5)}
     @media(max-width:980px){.span-8,.span-4,.span-6{grid-column:span 12}.sidebar{display:none}body{display:block}.main{padding:16px;height:100vh}}
   </style>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="logo" href="/"><i class="fas fa-cube"></i> JWORK</a>
+    <a class="logo" href="/"><span>EVER</span>FAST</a>
     <span class="nav-label">General</span>
     <a class="nav-link" data-route="overview" href="#overview"><i class="fas fa-th-large"></i> Overview</a>
     <a class="nav-link" data-route="files" href="#files"><i class="fas fa-folder"></i> All Files</a>
-    <span class="nav-label">System</span>
-    <a class="nav-link" data-route="referrals" href="#referrals"><i class="fas fa-share-nodes"></i> Referrals</a>
+    <span class="nav-label">Account</span>
     <a class="nav-link" data-route="settings" href="#settings"><i class="fas fa-cog"></i> Settings</a>
     <div style="margin-top:auto">
       <button class="nav-link" style="width:100%;text-align:left;color:var(--error);background:none;border:none;cursor:pointer" id="logout-btn"><i class="fas fa-power-off"></i> Logout</button>
@@ -77,15 +76,14 @@
             <strong class="mono">Vault Contents</strong>
             <button class="btn btn-primary" id="upload-btn"><i class="fas fa-upload"></i> Upload</button>
           </div>
+          <p class="small" style="margin-bottom:12px">⚠️ Files are currently limited to <strong>20 MB</strong> each. Larger file support is coming soon.</p>
           <div id="overview-files"></div>
         </div>
         <div class="card span-4">
           <div class="storage-ring" id="overview-ring"><span class="mono" id="overview-percent">0%</span></div>
           <p class="small mono" id="overview-storage">0GB / 0GB</p>
           <hr style="margin:14px 0;border-color:var(--border)">
-          <p class="small">Account summary</p>
-          <p style="margin-top:8px">Referrals: <span class="mono" id="overview-ref-count">0</span></p>
-          <p>Storage cap: <span class="mono" id="overview-cap">0GB</span></p>
+          <p class="small">Storage cap: <span class="mono" id="overview-cap">0GB</span></p>
         </div>
       </div>
     </section>
@@ -98,6 +96,318 @@
             <select id="file-type">
               <option value="all">All types</option><option value="image">Images</option><option value="video">Videos</option>
               <option value="audio">Audio</option><option value="pdf">PDF</option><option value="archive">Archives</option><option value="other">Other</option>
+            </select>
+            <select id="file-sort">
+              <option value="uploaded_desc">Newest</option><option value="uploaded_asc">Oldest</option>
+              <option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option>
+              <option value="size_desc">Largest</option><option value="size_asc">Smallest</option>
+            </select>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost" id="bulk-download">Bulk download</button>
+            <button class="btn btn-danger" id="bulk-delete">Bulk delete</button>
+          </div>
+        </div>
+        <div id="files-table-wrap"></div>
+        <div class="pagination" id="files-pagination"></div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="view hidden">
+      <div class="grid">
+        <div class="card span-6">
+          <p class="small">Profile</p>
+          <p style="margin:10px 0">Email: <span class="mono" id="settings-email">-</span></p>
+          <p>API base: <span class="mono" id="settings-api"></span></p>
+          <p style="margin-top:8px">Connection: <span id="api-status" class="pill">Unknown</span></p>
+        </div>
+        <div class="card span-6 danger">
+          <p class="small" style="color:var(--error)">Danger zone</p>
+          <p style="margin:8px 0 14px">Sign out of all sessions on this device.</p>
+          <button class="btn btn-danger" id="logout-all">Logout all</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"><span id="toast-msg"></span></div>
+
+  <script type="module">
+    import { safePercent, bytesToGB, getFileType, filterAndSortFiles, paginate } from './dashboard-utils.js';
+
+    const token = localStorage.getItem('jwork_token');
+    if (!token) window.location.href = '../auth';
+
+    const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+    const state = {
+      user: null,
+      files: [],
+      route: 'overview',
+      fileFilters: { query: '', type: 'all', sortBy: 'uploaded_desc' },
+      filePage: 1,
+      selected: new Set(),
+    };
+
+    const iconFor = (name) => {
+      const t = getFileType(name);
+      if (t === 'image') return 'fa-file-image';
+      if (t === 'pdf') return 'fa-file-pdf';
+      if (t === 'archive') return 'fa-file-archive';
+      if (t === 'video') return 'fa-file-video';
+      if (t === 'audio') return 'fa-file-audio';
+      return 'fa-file-alt';
+    };
+
+    function toast(msg, isErr = false) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = msg;
+      t.style.borderColor = isErr ? 'rgba(248,113,113,.5)' : 'var(--border)';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    async function api(path, opts = {}, retries = 1) {
+      try {
+        const res = await fetch(`${WORKER_URL}${path}`, {
+          ...opts,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(opts.headers || {}),
+          },
+        });
+        const data = await res.json().catch(() => ({ ok: false, error: 'Invalid server response' }));
+        if (!res.ok || !data.ok) {
+          const err = new Error(data.error || `Request failed (${res.status})`);
+          err.code = data.code || 'request_failed';
+          throw err;
+        }
+        return data;
+      } catch (e) {
+        if (retries > 0) return api(path, opts, retries - 1);
+        throw e;
+      }
+    }
+
+    function setRoute(route) {
+      const valid = ['overview', 'files', 'settings'];
+      state.route = valid.includes(route) ? route : 'overview';
+      document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
+      document.getElementById(`view-${state.route}`).classList.remove('hidden');
+      document.querySelectorAll('.nav-link[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === state.route));
+      document.getElementById('page-title').textContent = state.route[0].toUpperCase() + state.route.slice(1);
+      render();
+    }
+
+    function updateStorageUI() {
+      const used = Number(state.user?.storage_used || 0);
+      const cap = Number(state.user?.storage_cap || 0);
+      const pct = safePercent(used, cap);
+      document.getElementById('overview-percent').textContent = `${pct}%`;
+      document.getElementById('overview-storage').textContent = `${bytesToGB(used).toFixed(2)}GB / ${bytesToGB(cap).toFixed(2)}GB`;
+      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${pct}%, var(--surface-accent) 0%)`;
+      document.getElementById('overview-cap').textContent = `${bytesToGB(cap).toFixed(2)}GB`;
+    }
+
+    function renderOverviewFiles() {
+      const recent = [...state.files].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0)).slice(0, 8);
+      const wrap = document.getElementById('overview-files');
+      if (!recent.length) {
+        wrap.innerHTML = '<div class="empty">No files uploaded yet.</div>';
+        return;
+      }
+      wrap.innerHTML = `<table><thead><tr><th>Name</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map((f) => `
+        <tr>
+          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
+          <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
+          <td class="actions"><button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
+        </tr>`).join('')}</tbody></table>`;
+      wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+    }
+
+    function renderFilesTable() {
+      const filtered = filterAndSortFiles(state.files, state.fileFilters);
+      const pageData = paginate(filtered, state.filePage, 10);
+      state.filePage = pageData.page;
+
+      const wrap = document.getElementById('files-table-wrap');
+      if (!pageData.items.length) {
+        wrap.innerHTML = '<div class="empty">No files match your filters.</div>';
+      } else {
+        wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${pageData.items.map((f) => `
+          <tr>
+            <td><input type="checkbox" data-select="${f.id}" ${state.selected.has(String(f.id)) ? 'checked' : ''}></td>
+            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
+            <td>${getFileType(f.name)}</td>
+            <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
+            <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
+            <td class="actions">
+              <button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
+              <button data-delete="${f.id}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
+            </td>
+          </tr>`).join('')}</tbody></table>`;
+
+        const all = wrap.querySelector('#select-all');
+        all.checked = pageData.items.every((f) => state.selected.has(String(f.id))) && pageData.items.length > 0;
+        all.onchange = () => {
+          pageData.items.forEach((f) => {
+            if (all.checked) state.selected.add(String(f.id));
+            else state.selected.delete(String(f.id));
+          });
+          renderFilesTable();
+        };
+
+        wrap.querySelectorAll('[data-select]').forEach((el) => {
+          el.onchange = () => {
+            const id = String(el.dataset.select);
+            if (el.checked) state.selected.add(id); else state.selected.delete(id);
+          };
+        });
+        wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+        wrap.querySelectorAll('[data-delete]').forEach((b) => b.onclick = () => deleteFile(b.dataset.delete));
+      }
+
+      const pg = document.getElementById('files-pagination');
+      pg.innerHTML = `<button class="btn btn-ghost" ${pageData.page <= 1 ? 'disabled' : ''} id="pg-prev">Prev</button>
+                      <span class="small" style="padding:8px">Page ${pageData.page} / ${pageData.pages}</span>
+                      <button class="btn btn-ghost" ${pageData.page >= pageData.pages ? 'disabled' : ''} id="pg-next">Next</button>`;
+      const p = document.getElementById('pg-prev');
+      const n = document.getElementById('pg-next');
+      if (p) p.onclick = () => { state.filePage -= 1; renderFilesTable(); };
+      if (n) n.onclick = () => { state.filePage += 1; renderFilesTable(); };
+    }
+
+    function renderSettings() {
+      document.getElementById('settings-email').textContent = state.user?.email || '-';
+      document.getElementById('settings-api').textContent = WORKER_URL;
+      const status = document.getElementById('api-status');
+      status.className = 'pill good';
+      status.textContent = 'Connected';
+    }
+
+    function render() {
+      if (!state.user) return;
+      document.getElementById('user-display').textContent = state.user.email || '-';
+      updateStorageUI();
+      renderOverviewFiles();
+      renderFilesTable();
+      renderSettings();
+    }
+
+    async function refreshAll() {
+      try {
+        const [user, files] = await Promise.all([
+          api('/auth/me'),
+          api('/files'),
+        ]);
+        state.user = user;
+        state.files = files.files || [];
+        render();
+      } catch (e) {
+        if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
+        toast(e.message || 'Dashboard load failed', true);
+      }
+    }
+
+    async function uploadFile() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        if (file.size > 20 * 1024 * 1024) return toast('Files must be under 20MB.', true);
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          await api('/files/upload', { method: 'POST', body: fd, headers: {} });
+          toast('Upload complete');
+          await refreshAll();
+        } catch (e) {
+          toast(e.message || 'Upload failed', true);
+        }
+      };
+      input.click();
+    }
+
+    async function downloadFile(fileId, name) {
+      try {
+        const data = await api(`/files/download?fileId=${encodeURIComponent(fileId)}`);
+        const a = document.createElement('a');
+        a.href = data.url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        toast(e.message || 'Download failed', true);
+      }
+    }
+
+    async function deleteFile(id) {
+      if (!confirm('Delete file permanently?')) return;
+      try {
+        await api('/files/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileRecordId: id }),
+        });
+        state.selected.delete(String(id));
+        toast('File deleted');
+        await refreshAll();
+      } catch (e) {
+        toast(e.message || 'Delete failed', true);
+      }
+    }
+
+    async function bulkDelete() {
+      const ids = [...state.selected];
+      if (!ids.length) return toast('Select at least one file', true);
+      if (!confirm(`Delete ${ids.length} files?`)) return;
+      for (const id of ids) {
+        try {
+          await api('/files/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileRecordId: id }),
+          });
+        } catch (_) {}
+      }
+      state.selected.clear();
+      toast('Bulk delete finished');
+      await refreshAll();
+    }
+
+    async function bulkDownload() {
+      const ids = [...state.selected];
+      if (!ids.length) return toast('Select at least one file', true);
+      const selectedFiles = state.files.filter((f) => ids.includes(String(f.id)));
+      for (const f of selectedFiles) {
+        await downloadFile(f.file_id, f.name);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('jwork_token');
+      window.location.href = '../auth';
+    }
+
+    window.addEventListener('hashchange', () => setRoute(location.hash.replace('#', '') || 'overview'));
+
+    document.getElementById('upload-btn').onclick = uploadFile;
+    document.getElementById('logout-btn').onclick = logout;
+    document.getElementById('logout-all').onclick = logout;
+
+    document.getElementById('file-search').oninput = (e) => { state.fileFilters.query = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-type').onchange = (e) => { state.fileFilters.type = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-sort').onchange = (e) => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('bulk-delete').onclick = bulkDelete;
+    document.getElementById('bulk-download').onclick = bulkDownload;
+
+    setRoute(location.hash.replace('#', '') || 'overview');
+    refreshAll();
+  </script>
+</body>
+</html>
+
             </select>
             <select id="file-sort">
               <option value="uploaded_desc">Newest</option><option value="uploaded_asc">Oldest</option>
