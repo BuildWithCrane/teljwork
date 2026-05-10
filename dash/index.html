@@ -330,13 +330,22 @@
 
     async function downloadFile(fileId, name) {
       try {
-        const data = await api(`/files/download?fileId=${encodeURIComponent(fileId)}`);
+        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: 'Download failed' }));
+          throw new Error(data.error || `Download failed (${res.status})`);
+        }
+        const blob = await res.blob();
+        const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = data.url;
+        a.href = downloadUrl;
         a.download = name;
         document.body.appendChild(a);
         a.click();
         a.remove();
+        URL.revokeObjectURL(downloadUrl);
       } catch (e) {
         toast(e.message || 'Download failed', true);
       }
