@@ -136,7 +136,7 @@
     import { safePercent, bytesToGB, getFileType, filterAndSortFiles, paginate } from './dashboard-utils.js';
 
     const token = localStorage.getItem('jwork_token');
-    if (!token) window.location.href = '../auth';
+    if (!token) window.location.href = '/auth';
 
     const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
     const state = {
@@ -387,7 +387,7 @@
 
     function logout() {
       localStorage.removeItem('jwork_token');
-      window.location.href = '../auth';
+      window.location.href = '/auth';
     }
 
     window.addEventListener('hashchange', () => setRoute(location.hash.replace('#', '') || 'overview'));
