@@ -173,6 +173,14 @@
     if (!token) window.location.href = '../auth';
 
     const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+    const DEFAULT_REFERRAL_SUMMARY = {
+      referral_code: '',
+      qualified_referrals: 0,
+      earned_storage_gb: 0,
+      remaining_to_max_gb: 0,
+      referral_clicks: 0,
+      total_signups: 0,
+    };
     const state = {
       user: null,
       files: [],
@@ -369,7 +377,7 @@
         const [user, files, refSummary, refHistory, milestones] = await Promise.all([
           api('/auth/me'),
           api('/files'),
-          api('/referrals/summary').catch(() => ({ ok: true, referral_code: '', qualified_referrals: 0, earned_storage_gb: 0, remaining_to_max_gb: 0, referral_clicks: 0, total_signups: 0 })),
+          api('/referrals/summary').catch(() => ({ ok: true, ...DEFAULT_REFERRAL_SUMMARY })),
           api('/referrals/history').catch(() => ({ ok: true, history: [] })),
           api('/referrals/milestones').catch(() => ({ ok: true, milestones: [] })),
         ]);

@@ -14,7 +14,8 @@ const FILE_LIMIT = 20 * 1024 * 1024;
 const MAX_ACCOUNTS_PER_IP = 3;
 const MAX_DATACENTER_REFERRALS = 5;
 const PARTNER_CODES = ['MIGDNS25'];
-const REFERRAL_COOLDOWN_HOURS = 24;
+const REFERRAL_SAME_IP_COOLDOWN_HOURS = 24;
+const HOUR_MS = 3600 * 1000;
 const REFERRAL_MILESTONES = [1, 3, 5, 10, 15, 20];
 
 export default {
@@ -104,7 +105,7 @@ async function register(request, env) {
     if (refHash && refHash === userAgentHash) abuseReasons.push('same_device_fingerprint');
 
     if (ip !== 'unknown') {
-      const cutoff = new Date(Date.now() - REFERRAL_COOLDOWN_HOURS * 3600 * 1000).toISOString();
+      const cutoff = new Date(Date.now() - REFERRAL_SAME_IP_COOLDOWN_HOURS * HOUR_MS).toISOString();
       const sameIpRecent = await sbGet(env, `users?referred_by=eq.${referrer.id}&signup_ip=eq.${enc(ip)}&created_at=gte.${enc(cutoff)}&select=id`);
       if (sameIpRecent.length > 0) abuseReasons.push('same_ip_cooldown');
     }
@@ -311,7 +312,9 @@ async function getReferralSummary(request, env) {
 
   const referred = await sbGet(env, `users?referred_by=eq.${auth.userId}&select=id`);
   const qualified = Number(user.referral_count || 0);
-  const earnedBytes = Math.min(qualified * REFERRAL_BONUS, MAX_STORAGE - BASE_STORAGE);
+  const currentCap = Number(user.storage_cap || BASE_STORAGE);
+  const inferredStartCap = Math.max(BASE_STORAGE, Math.min(PARTNER_BONUS_STORAGE, currentCap - qualified * REFERRAL_BONUS));
+  const earnedBytes = Math.max(0, Math.min(currentCap - inferredStartCap, qualified * REFERRAL_BONUS));
   const clicks = Number(await readOptionalKV(env, `refclick:${user.referral_code}`) || 0);
 
   return jsonOk({
@@ -496,8 +499,8 @@ function jsonOk(data) {
   });
 }
 
-function jsonError(message, status = 400, code = 'bad_request', details = null) {
-  return new Response(JSON.stringify({ ok: false, error: message, code, details }), {
+function jsonError(message, status = 400, code = 'bad_request') {
+  return new Response(JSON.stringify({ ok: false, error: message, code }), {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
