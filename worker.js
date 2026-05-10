@@ -8,6 +8,8 @@ const CORS_HEADERS = {
 const GB = 1073741824;
 const BASE_STORAGE = 100 * GB;
 const FILE_LIMIT = 20 * 1024 * 1024;
+const JWT_EXPIRY_SECONDS = 86400 * 30;
+const PBKDF2_ITERATIONS = 100000;
 
 export default {
   async fetch(request, env) {
@@ -67,6 +69,7 @@ function serveAdminPage() {
         <button id="load">Load users</button>
       </div>
       <p class="muted" style="margin:10px 0 0">This page is intentionally hidden. Access requires the worker env var <span class="mono">ADMIN_PASSWORD</span>.</p>
+      <p class="muted" style="margin:8px 0 0">Use only over HTTPS.</p>
       <p id="status" class="muted" style="min-height:18px;margin:10px 0 0"></p>
     </div>
 
@@ -248,8 +251,8 @@ async function requireAdmin(request, env) {
   const configured = String(env.ADMIN_PASSWORD || '');
   if (!configured) return jsonError('ADMIN_PASSWORD is not configured', 500, 'admin_not_configured');
 
-  const supplied = String(request.headers.get('X-Admin-Password') || request.headers.get('x-admin-password') || '');
-  if (!supplied || !safeEqual(supplied, configured)) {
+  const supplied = String(request.headers.get('X-Admin-Password') || '');
+  if (!safeEqual(supplied, configured)) {
     return jsonError('Unauthorized', 401, 'unauthorized_admin');
   }
 
@@ -318,7 +321,8 @@ async function uploadFile(request, env) {
 
   const formData = await request.formData();
   const file = formData.get('file');
-  if (!file || file.size > FILE_LIMIT) return jsonError('File exceeds 20MB limit', 413, 'file_too_large');
+  if (!file) return jsonError('File is required', 400, 'missing_file');
+  if (file.size > FILE_LIMIT) return jsonError('File exceeds 20MB limit', 413, 'file_too_large');
 
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=storage_used,storage_cap`);
   const u = users[0];
@@ -453,7 +457,7 @@ async function sbDelete(env, q) {
 async function makeJWT(payload, secret) {
   const encb64 = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   const head = encb64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = encb64(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 86400 * 30 }));
+  const body = encb64(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY_SECONDS }));
   const data = `${head}.${body}`;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
@@ -481,7 +485,7 @@ async function requireAuth(request, env) {
 async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, key, 256);
   const toHex = (b) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
   return `${toHex(salt)}:${toHex(new Uint8Array(bits))}`;
 }
@@ -491,7 +495,7 @@ async function verifyPassword(password, stored) {
   if (!saltHex || !hashHex) return false;
   const salt = Uint8Array.from((saltHex.match(/.{2}/g) || []), (h) => parseInt(h, 16));
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, key, 256);
   const check = [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, '0')).join('');
   return check === hashHex;
 }
