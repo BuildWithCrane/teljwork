@@ -1,0 +1,247 @@
+*/ this will be on cloudflare workers
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': 'https://storage.jwork.ru',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const GB             = 1073741824;
+const BASE_STORAGE   = 10 * GB;
+const PARTNER_BONUS_STORAGE = 25 * GB;
+const REFERRAL_BONUS = 5  * GB;
+const MAX_STORAGE    = 100 * GB;
+const FILE_LIMIT     = 20 * 1024 * 1024; // 20 MB Bot API Download Limit
+
+const MAX_ACCOUNTS_PER_IP      = 3; 
+const MAX_DATACENTER_REFERRALS = 5; 
+const PARTNER_CODES = ['MIGDNS25'];
+
+export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+    const { pathname } = new URL(request.url);
+    try {
+      if (pathname === '/auth/register'  && request.method === 'POST') return register(request, env);
+      if (pathname === '/auth/login'     && request.method === 'POST') return login(request, env);
+      if (pathname === '/auth/me'        && request.method === 'GET')  return getMe(request, env);
+      if (pathname === '/files/upload'   && request.method === 'POST') return uploadFile(request, env);
+      if (pathname === '/files'          && request.method === 'GET')  return listFiles(request, env);
+      if (pathname === '/files/download' && request.method === 'GET')  return downloadFile(request, env);
+      if (pathname === '/files/delete'   && request.method === 'POST') return deleteFile(request, env);
+      return jsonError('Not found', 404);
+    } catch (err) {
+      return jsonError('Server error: ' + err.message, 500);
+    }
+  }
+};
+
+async function isDatacenterIP(ip) {
+  try {
+    const res  = await fetch(`http://ip-api.com/json/${ip}?fields=hosting`, { cf: { cacheTtl: 86400 } });
+    const data = await res.json();
+    return data.hosting === true;
+  } catch { return false; }
+}
+
+async function register(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const { username = '', password = '', referral_code = '' } = body;
+  if (!username || !password) return jsonError('Username and password are required');
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const [ipAccounts, isHosting] = await Promise.all([
+    ip !== 'unknown' ? sbGet(env, `users?signup_ip=eq.${enc(ip)}&select=id`) : Promise.resolve([]),
+    ip !== 'unknown' ? isDatacenterIP(ip) : Promise.resolve(false),
+  ]);
+  if (ipAccounts.length >= MAX_ACCOUNTS_PER_IP) return jsonError('Account limit reached', 429);
+  const existing = await sbGet(env, `users?username=eq.${enc(username)}&select=id`);
+  if (existing.length > 0) return jsonError('Username taken');
+  const passwordHash = await hashPassword(password);
+  const myCode = generateCode();
+  const upReferral = referral_code.toUpperCase();
+  const startingCap = PARTNER_CODES.includes(upReferral) ? PARTNER_BONUS_STORAGE : BASE_STORAGE;
+  let referredBy = null;
+  let grantReferralBonus = true;
+  if (referral_code) {
+    const refs = await sbGet(env, `users?referral_code=eq.${enc(upReferral)}&select=id,flagged`);
+    if (refs.length > 0) {
+      referredBy = refs[0].id;
+      if (refs[0].flagged) grantReferralBonus = false;
+    }
+  }
+  const newUsers = await sbPost(env, 'users', {
+    username, password_hash: passwordHash, referral_code: myCode,
+    referred_by: referredBy, storage_used: 0, storage_cap: startingCap,
+    signup_ip: ip, signup_ip_datacenter: isHosting
+  });
+  if (!newUsers?.length) return jsonError('Account creation failed');
+  const user = newUsers[0];
+  if (referredBy && grantReferralBonus) {
+    const referrers = await sbGet(env, `users?id=eq.${referredBy}&select=storage_cap,referral_count`);
+    if (referrers.length > 0) {
+      await sbPatch(env, `users?id=eq.${referredBy}`, {
+        storage_cap: Math.min(referrers[0].storage_cap + REFERRAL_BONUS, MAX_STORAGE),
+        referral_count: referrers[0].referral_count + 1,
+      });
+    }
+  }
+  const token = await makeJWT({ userId: user.id, username: user.username }, env.JWT_SECRET);
+  return jsonOk({ token, username: user.username, referral_code: myCode });
+}
+
+async function login(request, env) {
+  const { username = '', password = '' } = await request.json().catch(() => ({}));
+  const users = await sbGet(env, `users?username=eq.${enc(username)}&select=*`);
+  if (!users.length || !(await verifyPassword(password, users[0].password_hash))) return jsonError('Invalid credentials');
+  const user = users[0];
+  const token = await makeJWT({ userId: user.id, username: user.username }, env.JWT_SECRET);
+  return jsonOk({ token, username: user.username, storage_used: user.storage_used, storage_cap: user.storage_cap, referral_code: user.referral_code });
+}
+
+async function getMe(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401);
+  const users = await sbGet(env, `users?id=eq.${auth.userId}&select=*`);
+  return users.length ? jsonOk(users[0]) : jsonError('User not found', 404);
+}
+
+async function uploadFile(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401);
+  const formData = await request.formData();
+  const file = formData.get('file');
+  if (!file || file.size > FILE_LIMIT) return jsonError('File exceeds 20MB limit', 413);
+  const users = await sbGet(env, `users?id=eq.${auth.userId}&select=storage_used,storage_cap`);
+  const u = users[0];
+  if (u.storage_used + file.size > u.storage_cap) return jsonError('Storage full', 413);
+  const tgForm = new FormData();
+  tgForm.append('chat_id', env.CHAT_ID);
+  tgForm.append('caption', `👤 ${auth.username}\n📁 ${file.name}`);
+  let method = 'sendDocument';
+  const type = file.type || '';
+  if (type.startsWith('image/') && !file.name.endsWith('.gif')) method = 'sendPhoto';
+  else if (type.startsWith('video/')) method = 'sendVideo';
+  else if (type.startsWith('audio/')) method = 'sendAudio';
+  const key = method === 'sendPhoto' ? 'photo' : (method === 'sendVideo' ? 'video' : (method === 'sendAudio' ? 'audio' : 'document'));
+  tgForm.append(key, file, file.name);
+  const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, { method: 'POST', body: tgForm });
+  const tgData = await tgRes.json();
+  if (!tgData.ok) return jsonError('Telegram Upload Failed', 502);
+  const msg = tgData.result;
+  const fId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || msg.photo?.[msg.photo.length - 1]?.file_id;
+  const saved = await sbPost(env, 'files', {
+    user_id: auth.userId, name: file.name, size: file.size, type: file.type, file_id: fId, message_id: msg.message_id
+  });
+  await sbPatch(env, `users?id=eq.${auth.userId}`, { storage_used: u.storage_used + file.size });
+  return jsonOk({ file: saved[0] });
+}
+
+async function listFiles(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401);
+  const files = await sbGet(env, `files?user_id=eq.${auth.userId}&order=uploaded_at.desc&select=*`);
+  return jsonOk({ files });
+}
+
+async function downloadFile(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401);
+  const { searchParams } = new URL(request.url);
+  const fileId = searchParams.get('fileId'); 
+  if (!fileId) return jsonError('fileId required');
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id`);
+  if (files.length === 0) return jsonError('Access Denied', 404);
+  const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const tgData = await tgRes.json();
+  if (!tgData.ok) return jsonError(tgData.description, 502);
+  return jsonOk({ url: `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${tgData.result.file_path}` });
+}
+
+async function deleteFile(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401);
+  const { fileRecordId } = await request.json().catch(() => ({}));
+  const files = await sbGet(env, `files?id=eq.${fileRecordId}&user_id=eq.${auth.userId}&select=*`);
+  if (!files.length) return jsonError('File not found', 404);
+  const file = files[0];
+  await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/deleteMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: env.CHAT_ID, message_id: file.message_id }),
+  }).catch(() => {});
+  await sbDelete(env, `files?id=eq.${fileRecordId}`);
+  const users = await sbGet(env, `users?id=eq.${auth.userId}&select=storage_used`);
+  if (users.length) {
+    await sbPatch(env, `users?id=eq.${auth.userId}`, { storage_used: Math.max(0, users[0].storage_used - file.size) });
+  }
+  return jsonOk({ deleted: true });
+}
+
+const sbHeaders = env => ({ apikey: env.SUPABASE_KEY, Authorization: `Bearer ${env.SUPABASE_KEY}`, 'Content-Type': 'application/json' });
+async function sbGet(env, q) {
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${q}`, { headers: sbHeaders(env) });
+  return r.ok ? r.json() : Promise.reject(new Error(await r.text()));
+}
+async function sbPost(env, table, data) {
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST', headers: { ...sbHeaders(env), Prefer: 'return=representation' },
+    body: JSON.stringify(data),
+  });
+  return r.json();
+}
+async function sbPatch(env, q, data) {
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${q}`, {
+    method: 'PATCH', headers: { ...sbHeaders(env), Prefer: 'return=representation' },
+    body: JSON.stringify(data),
+  });
+  return r.json();
+}
+async function sbDelete(env, q) {
+  await fetch(`${env.SUPABASE_URL}/rest/v1/${q}`, { method: 'DELETE', headers: sbHeaders(env) });
+}
+
+async function makeJWT(payload, secret) {
+  const enc = s => btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  const head = enc(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = enc(JSON.stringify({ ...payload, exp: Math.floor(Date.now()/1000) + 86400*30 }));
+  const data = `${head}.${body}`;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+  return `${data}.${enc(String.fromCharCode(...new Uint8Array(sig)))}`;
+}
+
+async function verifyJWT(token, secret) {
+  try {
+    const [h, p, s] = token.split('.');
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name:'HMAC', hash:'SHA-256' }, false, ['verify']);
+    const sigBuf = Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+    const ok = await crypto.subtle.verify('HMAC', key, sigBuf, new TextEncoder().encode(`${h}.${p}`));
+    const decoded = JSON.parse(atob(p.replace(/-/g,'+').replace(/_/g,'/')));
+    return ok && decoded.exp > Date.now()/1000 ? decoded : null;
+  } catch { return null; }
+}
+
+async function requireAuth(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  return auth.startsWith('Bearer ') ? verifyJWT(auth.slice(7), env.JWT_SECRET) : null;
+}
+
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' }, key, 256);
+  const toHex = b => [...b].map(x => x.toString(16).padStart(2,'0')).join('');
+  return `${toHex(salt)}:${toHex(new Uint8Array(bits))}`;
+}
+
+async function verifyPassword(password, stored) {
+  const [saltHex, hashHex] = stored.split(':');
+  const salt = Uint8Array.from(saltHex.match(/.{2}/g), h => parseInt(h,16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' }, key, 256);
+  const check = [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2,'0')).join('');
+  return check === hashHex;
+}
+
+function generateCode() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
+function enc(s) { return encodeURIComponent(s); }
+function jsonOk(data) { return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }); }
+function jsonError(message, status = 400) { return new Response(JSON.stringify({ ok: false, error: message }), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }); }
