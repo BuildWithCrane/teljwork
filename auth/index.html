@@ -82,6 +82,16 @@
         const API_BASE = "https://sparkling-math-0017.wgattr14.workers.dev";
         let currentMode = 'login';
 
+        function preloadReferral() {
+            const params = new URLSearchParams(window.location.search);
+            const fromUrl = (params.get('ref') || '').trim().toUpperCase();
+            const fromStorage = (localStorage.getItem('jwork_pending_ref') || '').trim().toUpperCase();
+            const ref = fromUrl || fromStorage;
+            if (!ref) return;
+            switchMode('register');
+            document.getElementById('referral').value = ref;
+        }
+
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('login-tab').classList.toggle('active', mode === 'login');
@@ -119,6 +129,7 @@
                     msgDiv.className = "success";
                     msgDiv.innerText = "Success! Redirecting...";
                     localStorage.setItem('jwork_token', data.token);
+                    localStorage.removeItem('jwork_pending_ref');
                     setTimeout(() => window.location.href = '../dash', 800);
                 } else {
                     msgDiv.className = "error";
@@ -131,6 +142,8 @@
                 btn.disabled = false;
             }
         };
+
+        preloadReferral();
     </script>
 </body>
 </html>

@@ -1,313 +1,494 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jwork | Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%235200ff' d='M239.1 6.3l-208 78c-18.7 7-31.1 25-31.1 45v225.1c0 18.2 10.3 34.8 26.5 42.9l208 104c10.6 5.3 23.3 5.3 33.9 0l208-104c16.2-8.1 26.5-24.7 26.5-42.9V129.3c0-20-12.4-37.9-31.1-44.9l-208-78c-10.6-4-22.3-4-32.9 0zM256 68.4l192 72V340.4l-192 96-192-96V140.4l192-72z'/%3E%3C/svg%3E">
-    <style>
-        :root {
-            --bg: #050505; --surface: #0f0f0f; --surface-accent: #161616;
-            --border: rgba(255, 255, 255, 0.08); --primary: #5200ff;
-            --accent: #00f0ff; --text-main: #ffffff; --text-muted: #b8b8b8;
-            --success: #00ff85; --error: #ff4b4b; --sidebar-width: 260px;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-
-        /* Sidebar */
-        .sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px; }
-        .logo { font-weight: 800; font-size: 1.2rem; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
-        .logo i { color: var(--primary); }
-        .nav-group { margin-bottom: 32px; }
-        .nav-label { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; display: block; }
-        .nav-link { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; transition: 0.2s; margin-bottom: 4px; }
-        .nav-link:hover, .nav-link.active { background: var(--surface-accent); color: var(--text-main); }
-        .nav-link.active i { color: var(--primary); }
-
-        /* Main Content */
-        .main-content { flex: 1; overflow-y: auto; padding: 40px; position: relative; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-        .user-badge { display: flex; align-items: center; gap: 12px; background: var(--surface); padding: 8px 16px; border-radius: 100px; border: 1px solid var(--border); font-size: 0.85rem; }
-        
-        .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-        
-        /* Storage Ring */
-        .storage-hero { text-align: center; padding: 20px 0; }
-        .storage-ring { 
-            width: 160px; height: 160px; border-radius: 50%; 
-            margin: 0 auto 20px; display: flex; align-items: center; 
-            justify-content: center; flex-direction: column;
-            background: radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%),
-                        conic-gradient(var(--primary) 0%, var(--surface-accent) 0%);
-        }
-
-        /* File Table */
-        .file-table { width: 100%; border-collapse: collapse; }
-        .file-table th { text-align: left; font-size: 0.75rem; color: var(--text-muted); padding: 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; }
-        .file-table td { padding: 16px 12px; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
-        .file-icon { color: var(--primary); margin-right: 10px; width: 20px; text-align: center; }
-        .action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: 0.2s; padding: 5px; font-size: 1.1rem; }
-        .action-btn:hover { color: var(--primary); }
-        .action-btn.delete:hover { color: var(--error); }
-
-        /* Toast Notification */
-        #toast {
-            position: fixed; bottom: 30px; right: 30px; 
-            padding: 16px 24px; border-radius: 16px; 
-            background: var(--surface-accent); border: 1px solid var(--border);
-            color: white; font-weight: 600; display: flex; align-items: center; gap: 12px;
-            transform: translateY(150%); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 9999; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-        #toast.show { transform: translateY(0); }
-        .toast-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
-
-        .btn-primary { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jwork | Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --bg:#050505;--surface:#0f0f0f;--surface-accent:#161616;--border:rgba(255,255,255,.08);
+      --primary:#5200ff;--text:#fff;--muted:#b8b8b8;--error:#ff4b4b;--success:#00ff85;--sidebar:260px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Plus Jakarta Sans',sans-serif}
+    body{background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+    .mono{font-family:'JetBrains Mono',monospace}
+    .sidebar{width:var(--sidebar);background:var(--surface);padding:24px;border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .logo{font-weight:800;color:#fff;text-decoration:none;display:flex;gap:10px;align-items:center;margin-bottom:34px}
+    .logo i{color:var(--primary)}
+    .nav-label{font-size:.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;display:block}
+    .nav-link{display:flex;gap:12px;align-items:center;padding:12px;color:var(--muted);text-decoration:none;border-radius:12px;font-weight:600;font-size:.92rem}
+    .nav-link:hover,.nav-link.active{background:var(--surface-accent);color:#fff}
+    .main{flex:1;overflow:auto;padding:36px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:22px}
+    .badge{background:var(--surface);border:1px solid var(--border);padding:8px 14px;border-radius:100px;font-size:.84rem}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:18px}
+    .span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-12{grid-column:span 12}.span-6{grid-column:span 6}
+    .small{color:var(--muted);font-size:.82rem}
+    .btn{border:none;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:#fff}
+    .btn-danger{background:var(--error);color:#fff}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .storage-ring{width:150px;height:150px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;margin:8px auto;background:radial-gradient(closest-side,var(--surface) 79%,transparent 80% 100%),conic-gradient(var(--primary) 0%,var(--surface-accent) 0)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--border);padding:11px 8px;font-size:.9rem;text-align:left}
+    th{color:var(--muted);font-size:.75rem;text-transform:uppercase}
+    .actions button{background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer}
+    .actions button:hover{color:var(--primary)}
+    input,select{background:var(--surface-accent);color:#fff;border:1px solid var(--border);padding:9px 10px;border-radius:10px}
+    .pill{display:inline-block;padding:4px 8px;border-radius:8px;font-size:.7rem;font-weight:800;background:rgba(255,255,255,.08)}
+    .pill.good{background:var(--success);color:#000}
+    .hidden{display:none!important}
+    #toast{position:fixed;right:20px;bottom:20px;padding:12px 16px;background:var(--surface-accent);border:1px solid var(--border);border-radius:12px;transform:translateY(160%);transition:.2s}
+    #toast.show{transform:translateY(0)}
+    .pagination{display:flex;gap:8px;justify-content:flex-end;padding-top:12px}
+    .empty{padding:36px;text-align:center;color:var(--muted)}
+    .danger{border-color:rgba(255,75,75,.5)}
+    @media(max-width:980px){.span-8,.span-4,.span-6{grid-column:span 12}.sidebar{display:none}body{display:block}.main{padding:16px;height:100vh}}
+  </style>
 </head>
 <body>
+  <aside class="sidebar">
+    <a class="logo" href="/"><i class="fas fa-cube"></i> JWORK</a>
+    <span class="nav-label">General</span>
+    <a class="nav-link" data-route="overview" href="#overview"><i class="fas fa-th-large"></i> Overview</a>
+    <a class="nav-link" data-route="files" href="#files"><i class="fas fa-folder"></i> All Files</a>
+    <span class="nav-label">System</span>
+    <a class="nav-link" data-route="referrals" href="#referrals"><i class="fas fa-share-nodes"></i> Referrals</a>
+    <a class="nav-link" data-route="settings" href="#settings"><i class="fas fa-cog"></i> Settings</a>
+    <div style="margin-top:auto">
+      <button class="nav-link" style="width:100%;text-align:left;color:var(--error);background:none;border:none;cursor:pointer" id="logout-btn"><i class="fas fa-power-off"></i> Logout</button>
+    </div>
+  </aside>
 
-    <aside class="sidebar">
-        <a href="/" class="logo"><i class="fas fa-cube"></i> JWORK</a>
-        <div class="nav-group">
-            <span class="nav-label">General</span>
-            <a href="#" class="nav-link active"><i class="fas fa-th-large"></i> Overview</a>
-            <a href="#" class="nav-link"><i class="fas fa-folder"></i> All Files</a>
-        </div>
-        <div class="nav-group">
-            <span class="nav-label">System</span>
-            <a href="#" class="nav-link"><i class="fas fa-share-nodes"></i> Referrals</a>
-            <a href="#" class="nav-link"><i class="fas fa-cog"></i> Settings</a>
-        </div>
-        <div style="margin-top: auto;">
-            <div onclick="logout()" class="nav-link" style="color: var(--error); cursor: pointer;"><i class="fas fa-power-off"></i> Logout</div>
-        </div>
-    </aside>
-
-    <main class="main-content">
-        <div class="top-bar">
-            <h1>Files</h1>
-            <div class="user-badge">
-                <span class="mono" id="user-display">Loading...</span>
-            </div>
-        </div>
-
-        <div class="dash-grid">
-            <div class="card">
-                <div class="card-header">
-                    <span class="mono" style="font-weight: 800;">VAULT CONTENTS</span>
-                    <button class="btn-primary" onclick="triggerUpload()"><i class="fas fa-upload"></i> Upload</button>
-                </div>
-                <table class="file-table">
-                    <thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead>
-                    <tbody id="file-list"></tbody>
-                </table>
-            </div>
-
-            <div class="dash-right">
-                <div class="card" style="margin-bottom: 24px;">
-                    <div class="storage-hero">
-                        <div class="storage-ring" id="ring-element">
-                            <span class="mono" id="percent-label" style="font-size: 1.8rem; font-weight: 800;">0%</span>
-                        </div>
-                        <p class="mono" id="raw-storage-label" style="font-size: 1rem; color: var(--text-muted);">0B / 0B</p>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <span class="nav-label">Referral Link</span>
-                    <div class="mono" id="ref-link" onclick="copyRef()" style="background: var(--bg); padding: 12px; border-radius: 8px; font-size: 0.75rem; margin: 10px 0; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; cursor: pointer;">...</div>
-                    <p style="font-size: 0.7rem; color: var(--text-muted);"><i class="far fa-copy"></i> Click the box above to copy your invite link.</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <div id="toast">
-        <div class="toast-icon" id="toast-type"></div>
-        <span id="toast-msg"></span>
+  <main class="main">
+    <div class="top">
+      <h1 id="page-title">Overview</h1>
+      <div class="badge"><span class="mono" id="user-display">Loading...</span></div>
     </div>
 
-    <script>
-        // --- 1. AUTH GUARD ---
-        const token = localStorage.getItem('jwork_token');
-        if (!token) window.location.href = '../auth';
+    <section id="view-overview" class="view">
+      <div class="grid">
+        <div class="card span-8">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <strong class="mono">Vault Contents</strong>
+            <button class="btn btn-primary" id="upload-btn"><i class="fas fa-upload"></i> Upload</button>
+          </div>
+          <div id="overview-files"></div>
+        </div>
+        <div class="card span-4">
+          <div class="storage-ring" id="overview-ring"><span class="mono" id="overview-percent">0%</span></div>
+          <p class="small mono" id="overview-storage">0GB / 0GB</p>
+          <hr style="margin:14px 0;border-color:var(--border)">
+          <p class="small">Account summary</p>
+          <p style="margin-top:8px">Referrals: <span class="mono" id="overview-ref-count">0</span></p>
+          <p>Storage cap: <span class="mono" id="overview-cap">0GB</span></p>
+        </div>
+      </div>
+    </section>
 
-        const WORKER_URL = "https://sparkling-math-0017.wgattr14.workers.dev";
+    <section id="view-files" class="view hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <div class="row">
+            <input id="file-search" placeholder="Search files...">
+            <select id="file-type">
+              <option value="all">All types</option><option value="image">Images</option><option value="video">Videos</option>
+              <option value="audio">Audio</option><option value="pdf">PDF</option><option value="archive">Archives</option><option value="other">Other</option>
+            </select>
+            <select id="file-sort">
+              <option value="uploaded_desc">Newest</option><option value="uploaded_asc">Oldest</option>
+              <option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option>
+              <option value="size_desc">Largest</option><option value="size_asc">Smallest</option>
+            </select>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost" id="bulk-download">Bulk download</button>
+            <button class="btn btn-danger" id="bulk-delete">Bulk delete</button>
+          </div>
+        </div>
+        <div id="files-table-wrap"></div>
+        <div class="pagination" id="files-pagination"></div>
+      </div>
+    </section>
 
-        function showNotify(msg, type = 'info') {
-            const t = document.getElementById('toast');
-            const icon = document.getElementById('toast-type');
-            document.getElementById('toast-msg').innerText = msg;
-            icon.style.background = type === 'error' ? 'var(--error)' : 'var(--primary)';
-            icon.innerHTML = type === 'error' ? '<i class="fas fa-times"></i>' : '<i class="fas fa-check"></i>';
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 4000);
+    <section id="view-referrals" class="view hidden">
+      <div class="grid">
+        <div class="card span-6">
+          <p class="small">Referral link</p>
+          <div class="row" style="margin:8px 0 10px">
+            <input id="ref-link" style="flex:1" readonly>
+            <button class="btn btn-primary" id="copy-ref">Copy</button>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost" id="share-x">Share X</button>
+            <button class="btn btn-ghost" id="share-telegram">Share Telegram</button>
+          </div>
+          <img id="qr-code" alt="QR" style="margin-top:14px;max-width:180px;border-radius:12px;border:1px solid var(--border)">
+        </div>
+        <div class="card span-6">
+          <p class="small">Program progress</p>
+          <p style="margin:8px 0">Qualified referrals: <span class="mono" id="r-qualified">0</span></p>
+          <p>Earned storage: <span class="mono" id="r-earned">0GB</span></p>
+          <p>Remaining to max cap: <span class="mono" id="r-remaining">0GB</span></p>
+          <p style="margin-top:10px">Next milestone: <span class="mono" id="r-next">-</span></p>
+          <p class="small" id="r-funnel" style="margin-top:10px"></p>
+        </div>
+        <div class="card span-12">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <strong class="mono">Referral history</strong>
+            <span class="small">Qualification rules: no same-IP/device abuse, capped rewards</span>
+          </div>
+          <div id="ref-history-wrap"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="view hidden">
+      <div class="grid">
+        <div class="card span-6">
+          <p class="small">Profile</p>
+          <p style="margin:10px 0">Username: <span class="mono" id="settings-username">-</span></p>
+          <p>API base: <span class="mono" id="settings-api"></span></p>
+          <p style="margin-top:8px">Connection: <span id="api-status" class="pill">Unknown</span></p>
+        </div>
+        <div class="card span-6 danger">
+          <p class="small" style="color:var(--error)">Danger zone</p>
+          <p style="margin:8px 0 14px">Sign out of all sessions on this device.</p>
+          <button class="btn btn-danger" id="logout-all">Logout all</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"><span id="toast-msg"></span></div>
+
+  <script type="module">
+    import { safePercent, bytesToGB, getFileType, filterAndSortFiles, paginate } from './dashboard-utils.js';
+
+    const token = localStorage.getItem('jwork_token');
+    if (!token) window.location.href = '../auth';
+
+    const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+    const state = {
+      user: null,
+      files: [],
+      route: 'overview',
+      fileFilters: { query: '', type: 'all', sortBy: 'uploaded_desc' },
+      filePage: 1,
+      selected: new Set(),
+      referralSummary: null,
+      referralHistory: [],
+      referralMilestones: [],
+    };
+
+    const iconFor = (name) => {
+      const t = getFileType(name);
+      if (t === 'image') return 'fa-file-image';
+      if (t === 'pdf') return 'fa-file-pdf';
+      if (t === 'archive') return 'fa-file-archive';
+      if (t === 'video') return 'fa-file-video';
+      if (t === 'audio') return 'fa-file-audio';
+      return 'fa-file-alt';
+    };
+
+    function toast(msg, isErr = false) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = msg;
+      t.style.borderColor = isErr ? 'rgba(255,75,75,.5)' : 'var(--border)';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    async function api(path, opts = {}, retries = 1) {
+      try {
+        const res = await fetch(`${WORKER_URL}${path}`, {
+          ...opts,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(opts.headers || {}),
+          },
+        });
+        const data = await res.json().catch(() => ({ ok: false, error: 'Invalid server response' }));
+        if (!res.ok || !data.ok) {
+          const err = new Error(data.error || `Request failed (${res.status})`);
+          err.code = data.code || 'request_failed';
+          throw err;
         }
+        return data;
+      } catch (e) {
+        if (retries > 0) return api(path, opts, retries - 1);
+        throw e;
+      }
+    }
 
-        // --- 2. ICON LOGIC ---
-        const getIcon = (name) => {
-            const ext = name.split('.').pop().toLowerCase();
-            if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return 'fa-file-image';
-            if (['pdf'].includes(ext)) return 'fa-file-pdf';
-            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'fa-file-archive';
-            if (['mp4', 'mov', 'avi'].includes(ext)) return 'fa-file-video';
-            if (['mp3', 'wav'].includes(ext)) return 'fa-file-audio';
-            return 'fa-file-alt';
+    function setRoute(route) {
+      const valid = ['overview', 'files', 'referrals', 'settings'];
+      state.route = valid.includes(route) ? route : 'overview';
+      document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
+      document.getElementById(`view-${state.route}`).classList.remove('hidden');
+      document.querySelectorAll('.nav-link[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === state.route));
+      document.getElementById('page-title').textContent = state.route[0].toUpperCase() + state.route.slice(1);
+      render();
+    }
+
+    function updateStorageUI() {
+      const used = Number(state.user?.storage_used || 0);
+      const cap = Number(state.user?.storage_cap || 0);
+      const pct = safePercent(used, cap);
+      document.getElementById('overview-percent').textContent = `${pct}%`;
+      document.getElementById('overview-storage').textContent = `${bytesToGB(used).toFixed(2)}GB / ${bytesToGB(cap).toFixed(2)}GB`;
+      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${pct}%, var(--surface-accent) 0%)`;
+      document.getElementById('overview-cap').textContent = `${bytesToGB(cap).toFixed(2)}GB`;
+    }
+
+    function renderOverviewFiles() {
+      const recent = [...state.files].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0)).slice(0, 8);
+      const wrap = document.getElementById('overview-files');
+      if (!recent.length) {
+        wrap.innerHTML = '<div class="empty">No files uploaded yet.</div>';
+        return;
+      }
+      wrap.innerHTML = `<table><thead><tr><th>Name</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map((f) => `
+        <tr>
+          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
+          <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
+          <td class="actions"><button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
+        </tr>`).join('')}</tbody></table>`;
+      wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+    }
+
+    function renderFilesTable() {
+      const filtered = filterAndSortFiles(state.files, state.fileFilters);
+      const pageData = paginate(filtered, state.filePage, 10);
+      state.filePage = pageData.page;
+
+      const wrap = document.getElementById('files-table-wrap');
+      if (!pageData.items.length) {
+        wrap.innerHTML = '<div class="empty">No files match your filters.</div>';
+      } else {
+        wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${pageData.items.map((f) => `
+          <tr>
+            <td><input type="checkbox" data-select="${f.id}" ${state.selected.has(String(f.id)) ? 'checked' : ''}></td>
+            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
+            <td>${getFileType(f.name)}</td>
+            <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
+            <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
+            <td class="actions">
+              <button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
+              <button data-delete="${f.id}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
+            </td>
+          </tr>`).join('')}</tbody></table>`;
+
+        const all = wrap.querySelector('#select-all');
+        all.checked = pageData.items.every((f) => state.selected.has(String(f.id))) && pageData.items.length > 0;
+        all.onchange = () => {
+          pageData.items.forEach((f) => {
+            if (all.checked) state.selected.add(String(f.id));
+            else state.selected.delete(String(f.id));
+          });
+          renderFilesTable();
         };
 
-        async function refreshDash() {
-            try {
-                const headers = { 'Authorization': 'Bearer ' + token };
-                const [uRes, fRes] = await Promise.all([
-                    fetch(`${WORKER_URL}/auth/me`, { headers }),
-                    fetch(`${WORKER_URL}/files`, { headers })
-                ]);
+        wrap.querySelectorAll('[data-select]').forEach((el) => {
+          el.onchange = () => {
+            const id = String(el.dataset.select);
+            if (el.checked) state.selected.add(id); else state.selected.delete(id);
+          };
+        });
+        wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+        wrap.querySelectorAll('[data-delete]').forEach((b) => b.onclick = () => deleteFile(b.dataset.delete));
+      }
 
-                const user = await uRes.json();
-                const filesData = await fRes.json();
+      const pg = document.getElementById('files-pagination');
+      pg.innerHTML = `<button class="btn btn-ghost" ${pageData.page <= 1 ? 'disabled' : ''} id="pg-prev">Prev</button>
+                      <span class="small" style="padding:8px">Page ${pageData.page} / ${pageData.pages}</span>
+                      <button class="btn btn-ghost" ${pageData.page >= pageData.pages ? 'disabled' : ''} id="pg-next">Next</button>`;
+      const p = document.getElementById('pg-prev');
+      const n = document.getElementById('pg-next');
+      if (p) p.onclick = () => { state.filePage -= 1; renderFilesTable(); };
+      if (n) n.onclick = () => { state.filePage += 1; renderFilesTable(); };
+    }
 
-                if (!user.ok) return logout();
+    function renderReferrals() {
+      const s = state.referralSummary || {};
+      const link = `${window.location.origin}/index.html?ref=${encodeURIComponent(s.referral_code || '')}`;
+      const q = encodeURIComponent(link);
+      document.getElementById('ref-link').value = link;
+      document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${q}`;
+      document.getElementById('r-qualified').textContent = String(s.qualified_referrals || 0);
+      document.getElementById('r-earned').textContent = `${Number(s.earned_storage_gb || 0).toFixed(2)}GB`;
+      document.getElementById('r-remaining').textContent = `${Number(s.remaining_to_max_gb || 0).toFixed(2)}GB`;
+      document.getElementById('r-funnel').textContent = `Funnel: ${s.referral_clicks || 0} clicks → ${s.total_signups || 0} signups → ${s.qualified_referrals || 0} qualified`;
 
-                document.getElementById('user-display').innerText = user.username;
-                // Update referral link based on current domain
-                document.getElementById('ref-link').innerText = `${window.location.origin}/index.html?ref=${user.referral_code}`;
-                
-                const percent = Math.round((user.storage_used / user.storage_cap) * 100);
-                document.getElementById('percent-label').innerText = percent + '%';
-                document.getElementById('ring-element').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${percent}%, var(--surface-accent) 0%)`;
-                document.getElementById('raw-storage-label').innerText = `${(user.storage_used/1024**3).toFixed(2)}GB / ${(user.storage_cap/1024**3).toFixed(2)}GB`;
+      const next = (state.referralMilestones || []).find((m) => !m.reached);
+      document.getElementById('r-next').textContent = next ? `${next.required_referrals} refs (+${next.bonus_gb}GB badge)` : 'All milestones reached';
 
-                const list = document.getElementById('file-list');
-                
-                // --- 3. EMPTY STATE CHECK ---
-                if (!filesData.files || filesData.files.length === 0) {
-                    list.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 60px; color: var(--text-muted);">
-                        <i class="fas fa-folder-open" style="display:block; font-size: 2.5rem; margin-bottom: 15px; opacity: 0.3;"></i>
-                        <p>No files found in your vault.</p>
-                    </td></tr>`;
-                    return;
-                }
+      const wrap = document.getElementById('ref-history-wrap');
+      if (!state.referralHistory.length) {
+        wrap.innerHTML = '<div class="empty">No referral activity yet.</div>';
+      } else {
+        wrap.innerHTML = `<table><thead><tr><th>User</th><th>Joined</th><th>Status</th><th>Bonus</th><th>Reason</th></tr></thead><tbody>${state.referralHistory.map((r) => `
+          <tr>
+            <td>${r.username || 'Anonymous'}</td>
+            <td>${r.created_at ? new Date(r.created_at).toLocaleString() : '-'}</td>
+            <td><span class="pill ${r.qualified ? 'good' : ''}">${r.qualified ? 'Qualified' : 'Pending/Blocked'}</span></td>
+            <td class="mono">${Number(r.bonus_gb || 0).toFixed(2)}GB</td>
+            <td>${r.reason || '-'}</td>
+          </tr>`).join('')}</tbody></table>`;
+      }
 
-                list.innerHTML = filesData.files.map(f => `
-                    <tr>
-                        <td><i class="far ${getIcon(f.name)} file-icon"></i> ${f.name}</td>
-                        <td class="mono" style="font-size: 0.8rem;">${(f.size/1024/1024).toFixed(1)} MB</td>
-                        <td>
-                            <button class="action-btn" onclick="downloadFile('${f.file_id}', '${f.name}')" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
-                            <button class="action-btn delete" onclick="deleteFile('${f.id}')" title="Delete"><i class="fas fa-trash-alt"></i></button>
-                        </td>
-                    </tr>
-                `).join('');
-            } catch(e) { showNotify("Connection failed", "error"); }
-        }
+      document.getElementById('share-x').onclick = () => window.open(`https://x.com/intent/tweet?text=${encodeURIComponent('Join my Jwork vault: ' + link)}`, '_blank');
+      document.getElementById('share-telegram').onclick = () => window.open(`https://t.me/share/url?url=${q}&text=${encodeURIComponent('Join my Jwork vault')}`, '_blank');
+    }
 
-        async function triggerUpload() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.onchange = async () => {
-        const file = input.files[0];
-        
-        // Prevent uploads that will fail to download later
-        if (file.size > 20 * 1024 * 1024) {
-            return showNotify("Telegram Bot limit: Files must be under 20MB", "error");
-        }
+    function renderSettings() {
+      document.getElementById('settings-username').textContent = state.user?.username || '-';
+      document.getElementById('settings-api').textContent = WORKER_URL;
+      const status = document.getElementById('api-status');
+      status.className = 'pill good';
+      status.textContent = 'Connected';
+    }
 
-        showNotify("Encrypting & Uploading...");
+    function render() {
+      if (!state.user) return;
+      document.getElementById('user-display').textContent = state.user.username;
+      document.getElementById('overview-ref-count').textContent = String(state.user.referral_count || 0);
+      updateStorageUI();
+      renderOverviewFiles();
+      renderFilesTable();
+      renderReferrals();
+      renderSettings();
+    }
+
+    async function refreshAll() {
+      try {
+        const [user, files, refSummary, refHistory, milestones] = await Promise.all([
+          api('/auth/me'),
+          api('/files'),
+          api('/referrals/summary').catch(() => ({ ok: true, referral_code: '', qualified_referrals: 0, earned_storage_gb: 0, remaining_to_max_gb: 0, referral_clicks: 0, total_signups: 0 })),
+          api('/referrals/history').catch(() => ({ ok: true, history: [] })),
+          api('/referrals/milestones').catch(() => ({ ok: true, milestones: [] })),
+        ]);
+        state.user = user;
+        state.files = files.files || [];
+        state.referralSummary = refSummary;
+        state.referralHistory = refHistory.history || [];
+        state.referralMilestones = milestones.milestones || [];
+        render();
+      } catch (e) {
+        if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
+        toast(e.message || 'Dashboard load failed', true);
+      }
+    }
+
+    async function uploadFile() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        if (file.size > 20 * 1024 * 1024) return toast('Files must be under 20MB.', true);
         const fd = new FormData();
         fd.append('file', file);
-        
         try {
-            const res = await fetch(`${WORKER_URL}/files/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token },
-                body: fd
-            });
-            const data = await res.json();
-            if (data.ok) {
-                showNotify("Success: File stored in vault");
-                refreshDash();
-            } else { showNotify(data.error, "error"); }
-        } catch (e) { showNotify("Upload failed", "error"); }
-    };
-    input.click();
-}
-
-async function downloadFile(fileId, name) {
-    showNotify("Fetching secure key...");
-    try {
-        // Encode fileId to handle special characters correctly
-        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-        if (data.ok && data.url) {
-            const a = document.createElement('a');
-            a.href = data.url;
-            a.download = name;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } else { 
-            showNotify(data.error || "Access denied", "error"); 
+          await api('/files/upload', { method: 'POST', body: fd, headers: {} });
+          toast('Upload complete');
+          await refreshAll();
+        } catch (e) {
+          toast(e.message || 'Upload failed', true);
         }
-    } catch (e) { showNotify("Download failed", "error"); }
-}
-
-        async function downloadFile(fileId, name) {
-    showNotify("Fetching secure key...");
-    try {
-        // We use encodeURIComponent here so the long ID doesn't break the URL
-        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        
-        const data = await res.json();
-        
-        if (data.ok && data.url) {
-            const a = document.createElement('a');
-            a.href = data.url;
-            a.download = name;
-            document.body.appendChild(a); // Required for some browsers
-            a.click();
-            a.remove();
-        } else { 
-            // This will now show you the ACTUAL error from the worker
-            showNotify(data.error || "Access denied", "error"); 
-        }
-    } catch (e) { 
-        showNotify("Download failed", "error"); 
+      };
+      input.click();
     }
-}
 
-        async function deleteFile(id) {
-            if(!confirm("Destroy this file permanently?")) return;
-            await fetch(`${WORKER_URL}/files/delete`, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileRecordId: id })
-            });
-            refreshDash();
-        }
+    async function downloadFile(fileId, name) {
+      try {
+        const data = await api(`/files/download?fileId=${encodeURIComponent(fileId)}`);
+        const a = document.createElement('a');
+        a.href = data.url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        toast(e.message || 'Download failed', true);
+      }
+    }
 
-        // --- 4. COPY REFERRAL LOGIC ---
-        function copyRef() {
-            const link = document.getElementById('ref-link').innerText;
-            navigator.clipboard.writeText(link).then(() => {
-                showNotify("Link copied to clipboard!");
-            });
-        }
+    async function deleteFile(id) {
+      if (!confirm('Delete file permanently?')) return;
+      try {
+        await api('/files/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileRecordId: id }),
+        });
+        state.selected.delete(String(id));
+        toast('File deleted');
+        await refreshAll();
+      } catch (e) {
+        toast(e.message || 'Delete failed', true);
+      }
+    }
 
-        function logout() { localStorage.removeItem('jwork_token'); window.location.href = '../auth'; }
-        refreshDash();
-    </script>
+    async function bulkDelete() {
+      const ids = [...state.selected];
+      if (!ids.length) return toast('Select at least one file', true);
+      if (!confirm(`Delete ${ids.length} files?`)) return;
+      for (const id of ids) {
+        try {
+          await api('/files/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileRecordId: id }),
+          });
+        } catch (_) {}
+      }
+      state.selected.clear();
+      toast('Bulk delete finished');
+      await refreshAll();
+    }
+
+    async function bulkDownload() {
+      const ids = [...state.selected];
+      if (!ids.length) return toast('Select at least one file', true);
+      const selectedFiles = state.files.filter((f) => ids.includes(String(f.id)));
+      for (const f of selectedFiles) {
+        await downloadFile(f.file_id, f.name);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('jwork_token');
+      window.location.href = '../auth';
+    }
+
+    window.addEventListener('hashchange', () => setRoute(location.hash.replace('#', '') || 'overview'));
+
+    document.getElementById('upload-btn').onclick = uploadFile;
+    document.getElementById('logout-btn').onclick = logout;
+    document.getElementById('logout-all').onclick = logout;
+    document.getElementById('copy-ref').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(document.getElementById('ref-link').value);
+        toast('Referral link copied');
+      } catch {
+        toast('Clipboard unavailable', true);
+      }
+    };
+
+    document.getElementById('file-search').oninput = (e) => { state.fileFilters.query = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-type').onchange = (e) => { state.fileFilters.type = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-sort').onchange = (e) => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('bulk-delete').onclick = bulkDelete;
+    document.getElementById('bulk-download').onclick = bulkDownload;
+
+    setRoute(location.hash.replace('#', '') || 'overview');
+    refreshAll();
+  </script>
 </body>
 </html>
