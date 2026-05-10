@@ -9,6 +9,7 @@ test('safeJson handles invalid payloads', () => {
 
 test('enc safely URL-encodes strings', () => {
   assert.equal(__testables.enc('A B+C'), 'A%20B%2BC');
+  assert.equal(__testables.enc('50% & café'), '50%25%20%26%20caf%C3%A9');
 });
 
 test('parseStorageCapBytes converts GB and rejects invalid limits', () => {

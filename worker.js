@@ -100,8 +100,9 @@ function serveAdminPage() {
     let adminPassword = '';
     let users = [];
 
-    const bytesToGb = (bytes) => (Number(bytes || 0) / (1024 ** 3)).toFixed(2);
-    const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+    const GB = 1073741824;
+    const bytesToGb = (bytes) => (Number(bytes || 0) / GB).toFixed(2);
+    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
 
     function setStatus(message, type = 'muted') {
       const el = document.getElementById('status');
@@ -120,7 +121,7 @@ function serveAdminPage() {
 
       body.innerHTML = users.map((u) => {
         const id = esc(u.id);
-        const limitGb = Number((Number(u.storage_cap || 0) / (1024 ** 3)).toFixed(2));
+        const limitGb = Number((Number(u.storage_cap || 0) / GB).toFixed(2));
         return '<tr>' +
           '<td>' + esc(u.email || '-') + '</td>' +
           '<td class="mono">' + bytesToGb(u.storage_used) + ' GB</td>' +
@@ -148,7 +149,7 @@ function serveAdminPage() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'X-Admin-Password': adminPassword,
+                Authorization: 'Bearer ' + adminPassword,
               },
               body: JSON.stringify({ userId, storageCapGb: capGb }),
             });
@@ -168,7 +169,7 @@ function serveAdminPage() {
     async function loadUsers() {
       try {
         const res = await fetch('/admin/users', {
-          headers: { 'X-Admin-Password': adminPassword },
+          headers: { Authorization: 'Bearer ' + adminPassword },
         });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load users');
@@ -248,10 +249,20 @@ function parseStorageCapBytes(body) {
 }
 
 async function requireAdmin(request, env) {
+  const reqUrl = new URL(request.url);
+  const forwardedProto = String(request.headers.get('x-forwarded-proto') || '').toLowerCase();
+  const isHttps = reqUrl.protocol === 'https:' || forwardedProto === 'https';
+  const isLocalDev = reqUrl.hostname === 'localhost' || reqUrl.hostname === '127.0.0.1';
+  if (!isHttps && !isLocalDev) {
+    return jsonError('Admin access requires HTTPS', 400, 'https_required');
+  }
+
   const configured = String(env.ADMIN_PASSWORD || '');
   if (!configured) return jsonError('ADMIN_PASSWORD is not configured', 500, 'admin_not_configured');
 
-  const supplied = String(request.headers.get('X-Admin-Password') || '');
+  const authHeader = String(request.headers.get('Authorization') || '');
+  const suppliedFromBearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const supplied = String(suppliedFromBearer || request.headers.get('X-Admin-Password') || '');
   if (!safeEqual(supplied, configured)) {
     return jsonError('Unauthorized', 401, 'unauthorized_admin');
   }
@@ -343,13 +354,13 @@ async function uploadFile(request, env) {
   const key = keyMap[method] || 'document';
   tgForm.append(key, file, file.name);
 
-  const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, { method: 'POST', body: tgForm });
+  const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/${method}`, { method: 'POST', body: tgForm });
   const tgData = await tgRes.json();
   if (!tgData.ok) return jsonError('Telegram upload failed', 502, 'telegram_upload_failed');
 
   const msg = tgData.result;
-  const photoFileId = Array.isArray(msg.photo) && msg.photo.length > 0 ? msg.photo[msg.photo.length - 1].file_id : null;
-  const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || photoFileId;
+  const largestPhotoFileId = Array.isArray(msg.photo) && msg.photo.length > 0 ? msg.photo[msg.photo.length - 1].file_id : null;
+  const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || largestPhotoFileId;
   const saved = await sbPost(env, 'files', {
     user_id: auth.userId,
     name: file.name,
@@ -378,14 +389,27 @@ async function downloadFile(request, env) {
   const fileId = searchParams.get('fileId');
   if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
 
-  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id`);
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
   if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
+  const file = files[0];
 
-  const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getFile?file_id=${encodeURIComponent(fileId)}`);
   const tgData = await tgRes.json();
   if (!tgData.ok) return jsonError(tgData.description || 'Telegram fetch failed', 502, 'telegram_get_file_failed');
 
-  return jsonOk({ url: `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${tgData.result.file_path}` });
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`);
+  if (!fileResponse.ok) return jsonError('Telegram file download failed', 502, 'telegram_download_failed');
+
+  const filename = file.name ? String(file.name) : 'download.bin';
+  return new Response(fileResponse.body, {
+    status: 200,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename*=UTF-8''${enc(filename)}`,
+      'Cache-Control': 'no-store',
+    },
+  });
 }
 
 async function deleteFile(request, env) {
@@ -399,11 +423,13 @@ async function deleteFile(request, env) {
   if (!files.length) return jsonError('File not found', 404, 'file_not_found');
   const file = files[0];
 
-  await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/deleteMessage`, {
+  await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/deleteMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: env.CHAT_ID, message_id: file.message_id }),
-  }).catch(() => {});
+  }).catch(() => {
+    // Deletion is best-effort because the file record should still be removed if Telegram cleanup fails.
+  });
 
   await sbDelete(env, `files?id=eq.${fileRecordId}`);
 
