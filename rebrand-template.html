@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Everfast | Jwork Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { color-scheme: dark; }
+        body {
+            background-color: #020617;
+            font-family: 'Inter', sans-serif;
+        }
+        .hero-mesh {
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+        }
+        .text-glow {
+            text-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+        }
+        .btn-shine {
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-shine::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            transition: 0.5s;
+        }
+        .btn-shine:hover::after {
+            left: 120%;
+        }
+        /* Style for the new redirects */
+        .jwork-link {
+            text-decoration: none;
+            color: inherit;
+            transition: opacity 0.2s;
+        }
+        .jwork-link:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body class="hero-mesh min-h-screen text-slate-300 antialiased">
+
+    <!-- Nav -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#020617]/80 backdrop-blur-md">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-black tracking-tighter text-white">
+                EVER<span class="text-blue-500">FAST</span>
+            </div>
+            <div class="hidden md:flex gap-10 items-center">
+                <a href="#architecture" class="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white transition">Infrastructure</a>
+                <a href="#" class="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white transition">Pricing</a>
+                <button class="bg-white text-black text-xs font-black px-6 py-2 rounded-full hover:bg-blue-500 hover:text-white transition-all">
+                    SIGN IN
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="container mx-auto px-6 pt-48 pb-32">
+        <div class="max-w-5xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/20 bg-blue-500/5 mb-8">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Network Status: Optimized</span>
+            </div>
+            
+            <h1 class="text-7xl md:text-8xl lg:text-[11rem] font-black mb-10 leading-[0.8] tracking-tighter text-white text-glow">
+                FAST <br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-700">FOREVER.</span>
+            </h1>
+            
+            <p class="text-slate-400 text-xl md:text-2xl max-w-2xl mb-12 leading-relaxed">
+                Experience 100GB of unthrottled cloud architecture. 
+                <span class="text-white">Zero subscription fees.</span> 
+                Built for those who move at the speed of light.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 max-w-xl">
+                <input type="email" placeholder="Enter your work email" 
+                       class="flex-1 bg-slate-900/40 border border-white/10 px-8 py-5 rounded-2xl outline-none focus:border-blue-500 transition text-white">
+                <button class="btn-shine bg-blue-600 text-white font-black px-10 py-5 rounded-2xl transition shadow-2xl shadow-blue-600/20">
+                    Get Access
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="container mx-auto px-6 py-20">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-1">
+            <div class="p-12 glass-card rounded-t-[3rem] md:rounded-l-[3rem] md:rounded-tr-none">
+                <p class="text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Capacity</p>
+                <h2 class="text-6xl font-black text-white tracking-tighter">10PB+</h2>
+                <p class="text-slate-500 mt-6 text-sm">Redundant node architecture.</p>
+            </div>
+            <div class="p-12 glass-card bg-blue-600/5 border-x-0 md:border-x border-white/5">
+                <p class="text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Latency</p>
+                <h2 class="text-6xl font-black italic text-white tracking-tighter">&lt;20ms</h2>
+                <p class="text-slate-500 mt-6 text-sm">Direct-fiber backbone peering.</p>
+            </div>
+            <div class="p-12 glass-card rounded-b-[3rem] md:rounded-r-[3rem] md:rounded-bl-none">
+                <p class="text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Security</p>
+                <h2 class="text-6xl font-black text-white tracking-tighter">AES</h2>
+                <p class="text-slate-500 mt-6 text-sm">Military-grade cold storage.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Visual Section -->
+    <section id="architecture" class="container mx-auto px-6 py-32">
+        <div class="relative rounded-[4rem] overflow-hidden border border-white/5 bg-slate-900/20 p-8 md:p-20">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="text-5xl font-black text-white tracking-tighter mb-8">Not just a drive. <br>A powerhouse.</h2>
+                    <div class="space-y-12">
+                        <div class="flex gap-8">
+                            <span class="text-5xl font-black text-blue-900/50">01</span>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Immutable Backups</h4>
+                                <p class="text-slate-400">Once it's in Everfast, it stays exactly as it was. No data rot, ever.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-8">
+                            <span class="text-5xl font-black text-blue-900/50">02</span>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Zero-Knowledge</h4>
+                                <p class="text-slate-400">Privacy isn't a feature; it's the foundation of the <a href="https://projects.jwork.ru" class="jwork-link">Jwork</a> group.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <div class="absolute inset-0 bg-blue-600/20 blur-[100px]"></div>
+                    <div class="relative glass-card p-1 border-white/10 rounded-3xl transform rotate-2">
+                         <div class="bg-slate-950 rounded-[1.4rem] p-10">
+                            <div class="flex justify-between items-end mb-4">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Packet Transfer</span>
+                                <span class="text-blue-400 font-mono text-xs">74%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 h-1.5 rounded-full mb-8">
+                                <div class="bg-blue-500 h-full w-[74%] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                            </div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="h-8 bg-blue-500/20 rounded"></div>
+                                <div class="h-8 bg-blue-500/20 rounded"></div>
+                                <div class="h-8 bg-blue-500/40 animate-pulse rounded"></div>
+                                <div class="h-8 bg-slate-800 rounded"></div>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="container mx-auto px-6 pb-20">
+        <div class="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[3rem] p-16 md:p-24 text-center">
+            <h2 class="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter">Start your legacy.</h2>
+            <button class="bg-white text-blue-900 font-black px-12 py-5 rounded-2xl text-xl hover:scale-105 transition-transform shadow-xl">
+                Claim 100GB Free
+            </button>
+            <p class="mt-8 text-blue-200/60 text-xs font-bold uppercase tracking-widest">Limited slots for 2026</p>
+        </div>
+        <div class="mt-20 flex flex-col md:flex-row justify-between items-center opacity-40">
+            <div class="text-lg font-black text-white">EVER<span class="text-blue-500">FAST</span></div>
+            <div class="text-[10px] font-bold tracking-[0.4em] uppercase">© <a href="https://projects.jwork.ru" class="jwork-link">Jwork</a> Infrastructure Group</div>
+        </div>
+    </footer>
+
+</body>
+</html>
