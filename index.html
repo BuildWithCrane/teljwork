@@ -1,373 +1,210 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jwork | Free Anonymous Cloud</title>
+    <title>Everfast | Free Photo &amp; Video Cloud</title>
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://storage.jwork.ru/">
-    <meta property="og:title" content="Jwork — Free Anonymous Cloud Storage">
-    <meta property="og:description" content="No credit cards. No subscriptions. No identity. Just high-speed AES-256 encrypted storage for the privacy-conscious.">
+    <meta property="og:title" content="Everfast — Free Cloud for Photographers">
+    <meta property="og:description" content="100GB free. No subscriptions. Built for photos and videos. AES-256 encrypted cloud storage by Jwork.">
     <meta property="og:image" content="https://storage.jwork.ru/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:site_name" content="Jwork">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://storage.jwork.ru/">
-    <meta name="twitter:title" content="Jwork — Free Anonymous Cloud Storage">
-    <meta name="twitter:description" content="No credit cards. No subscriptions. No identity. Just high-speed AES-256 encrypted storage for the privacy-conscious.">
+    <meta name="twitter:title" content="Everfast — Free Cloud for Photographers">
+    <meta name="twitter:description" content="100GB free. No subscriptions. Built for photos and videos.">
     <meta name="twitter:image" content="https://storage.jwork.ru/og-image.png">
 
     <!-- SEO -->
-    <meta name="description" content="No credit cards. No subscriptions. No identity. Just high-speed AES-256 encrypted storage for the privacy-conscious.">
+    <meta name="description" content="100GB free cloud storage for photographers and videographers. No credit cards. No subscriptions. AES-256 encrypted.">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://storage.jwork.ru/">
-    
-    <!-- Preconnect for performance -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%235200ff' d='M239.1 6.3l-208 78c-18.7 7-31.1 25-31.1 45v225.1c0 18.2 10.3 34.8 26.5 42.9l208 104c10.6 5.3 23.3 5.3 33.9 0l208-104c16.2-8.1 26.5-24.7 26.5-42.9V129.3c0-20-12.4-37.9-31.1-44.9l-208-78c-10.6-4-22.3-4-32.9 0zM256 68.4l192 72V340.4l-192 96-192-96V140.4l192-72z'/%3E%3C/svg%3E">
-    
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #050505;
-            --surface: #0f0f0f;
-            --surface-accent: #161616;
-            --border: rgba(255, 255, 255, 0.08);
-            --primary: #5200ff;
-            --accent: #00f0ff; 
-            --text-main: #ffffff;
-            --text-muted: #b8b8b8;
-            --success: #00ff85;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        * {
-            margin: 0; padding: 0; box-sizing: border-box;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-
+        :root { color-scheme: dark; }
         body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            line-height: 1.6;
-            overflow-x: hidden;
+            background-color: #020617;
+            font-family: 'Inter', sans-serif;
         }
-
-        .mono { font-family: 'JetBrains Mono', monospace; }
-
-        .glow-bg {
-            position: fixed;
-            top: 0; left: 50%;
-            transform: translateX(-50%);
-            width: 100%; height: 600px;
-            background: radial-gradient(circle at 50% 0%, rgba(82, 0, 255, 0.15) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 0;
+        .hero-mesh {
+            background-image:
+                radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
         }
-
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
-
-        nav {
-            padding: 18px 0;
-            border-bottom: 1px solid var(--border);
-            background: rgba(5, 5, 5, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            position: sticky; top: 0; z-index: 100;
+        .text-glow {
+            text-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
         }
-
-        .nav-inner { display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-weight: 800; font-size: 1.3rem; letter-spacing: 1px; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .logo i { color: var(--primary); }
-
-        .nav-links { display: flex; align-items: center; gap: 32px; }
-        .nav-links a {
-            color: var(--text-muted); text-decoration: none;
-            font-size: 0.9rem; font-weight: 600;
-            transition: var(--transition);
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
         }
-        .nav-links a:hover { color: var(--text-main); }
-
-        .hero { padding: 80px 0 60px; text-align: center; }
-        
-        .h-tag {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(82, 0, 255, 0.1);
-            color: var(--primary);
-            padding: 8px 16px; border-radius: 100px;
-            font-size: 0.75rem; font-weight: 800;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin-bottom: 32px; border: 1px solid rgba(82, 0, 255, 0.2);
-        }
-
-        h1 {
-            font-size: clamp(2.5rem, 8vw, 4.2rem);
-            font-weight: 800;
-            letter-spacing: -2px;
-            margin-bottom: 24px;
-            line-height: 1.05;
-            background: linear-gradient(135deg, #fff 60%, var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero p {
-            color: var(--text-muted);
-            font-size: 1.25rem;
-            max-width: 640px;
-            margin: 0 auto 48px;
-        }
-
-        .vault-container {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            padding: 48px;
-            max-width: 850px;
-            margin: 0 auto;
-            text-align: left;
+        .btn-shine {
             position: relative;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+            overflow: hidden;
         }
-
-        .vault-header {
-            display: flex; justify-content: space-between; align-items: flex-end;
-            margin-bottom: 32px;
+        .btn-shine::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            transition: 0.5s;
         }
-
-        .capacity-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-        .capacity-value { font-size: 3.5rem; font-weight: 800; line-height: 1; margin-top: 4px; }
-        .capacity-value span { font-size: 1.2rem; color: var(--text-muted); margin-left: 4px; }
-
-        .progress-track {
-            height: 14px; background: #1a1a1a;
-            border-radius: 100px; overflow: hidden;
-            margin-bottom: 40px; border: 1px solid var(--border);
-        }
-        
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 15px rgba(82, 0, 255, 0.4); }
-            50% { box-shadow: 0 0 30px rgba(82, 0, 255, 0.7); }
-            100% { box-shadow: 0 0 15px rgba(82, 0, 255, 0.4); }
-        }
-
-        .progress-fill {
-            height: 100%; width: 20%;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-            animation: pulse-glow 3s infinite ease-in-out;
-        }
-
-        .reward-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
-        }
-
-        .reward-item {
-            background: var(--surface-accent);
-            padding: 24px; border-radius: 20px;
-            border: 1px solid var(--border);
-            transition: var(--transition);
-            display: flex; flex-direction: column;
-            justify-content: space-between;
-        }
-        
-        .reward-item.locked { 
-            opacity: 0.6; 
-            background: rgba(255,255,255,0.02);
-        }
-
-        .reward-item:not(.locked):hover { 
-            border-color: var(--primary); 
-            transform: translateY(-4px); 
-            background: rgba(82, 0, 255, 0.05);
-        }
-
-        .reward-title { font-weight: 700; font-size: 1rem; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-        .reward-desc { font-size: 0.85rem; color: var(--text-muted); }
-        
-        .status-pill {
-            font-size: 0.65rem; padding: 4px 10px; border-radius: 6px;
-            background: rgba(255,255,255,0.08); font-weight: 800;
-            text-transform: uppercase;
-        }
-        .status-pill.unlocked { background: var(--success); color: #000; }
-
-        .btn {
-            display: inline-block; padding: 16px 32px; border-radius: 14px;
-            text-decoration: none; font-weight: 700; font-size: 1rem;
-            transition: var(--transition); cursor: pointer; border: none;
-        }
-
-        .btn-primary { 
-            background: var(--primary); color: white; width: 100%; 
-            margin-top: 40px; text-align: center;
-            box-shadow: 0 4px 15px rgba(82, 0, 255, 0.3);
-        }
-        .btn-primary:hover { 
-            background: #6217ff; 
-            box-shadow: 0 12px 30px rgba(82, 0, 255, 0.5);
-            transform: translateY(-2px);
-        }
-
-        .btn-login { 
-            border: 1px solid var(--border); 
-            color: white; padding: 10px 24px; 
-            background: transparent;
-        }
-        .btn-login:hover { background: white; color: black; border-color: white; }
-
-        .referral-note {
-            margin-top: 16px;
-            text-align: center;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        .features { padding: 100px 0; text-align: center; }
-        .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 40px; }
-        .feature-card i { font-size: 2rem; color: var(--primary); margin-bottom: 20px; }
-        .feature-card h3 { margin-bottom: 12px; font-size: 1.2rem; }
-        .feature-card p { color: var(--text-muted); font-size: 0.95rem; }
-
-        .footer { padding: 80px 0 40px; text-align: center; border-top: 1px solid var(--border); }
-        .footer p { font-size: 0.9rem; color: var(--text-muted); }
-        .social-links { font-size: 1.4rem; display: flex; gap: 32px; justify-content: center; margin-top: 32px; }
-        .social-links a { color: var(--text-muted); transition: var(--transition); }
-        .social-links a:hover { color: var(--primary); transform: scale(1.1); }
-
-        @media (max-width: 768px) {
-            .reward-grid, .feature-grid { grid-template-columns: 1fr; }
-            h1 { font-size: 2.8rem; }
-            .nav-links a:not(.btn-login) { display: none; }
-            .vault-container { padding: 32px 24px; }
-            .vault-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+        .btn-shine:hover::after {
+            left: 120%;
         }
     </style>
 </head>
-<body>
 
-    <div class="glow-bg"></div>
+<body class="hero-mesh min-h-screen text-slate-300 antialiased">
 
-    <nav>
-        <div class="container nav-inner">
-            <a href="https://storage.jwork.ru/" class="logo">
-                <i class="fas fa-cube"></i> JWORK
-            </a>
-            <div class="nav-links">
-                <a href="#features">About</a>
-                <a href="#features">Security</a>
-                <a href="https://storage.jwork.ru/auth" class="btn btn-login" data-auth-link>Get Started</a>
+    <!-- Nav -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#020617]/80 backdrop-blur-md">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-black tracking-tighter text-white">
+                EVER<span class="text-blue-500">FAST</span>
+            </div>
+            <div class="hidden md:flex gap-10 items-center">
+                <a href="#features" class="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white transition">Features</a>
+                <a href="https://storage.jwork.ru/auth" class="bg-white text-black text-xs font-black px-6 py-2 rounded-full hover:bg-blue-500 hover:text-white transition-all">
+                    SIGN IN
+                </a>
             </div>
         </div>
     </nav>
 
-    <main>
-        <header class="hero">
-            <div class="container">
-                <span class="h-tag"><i class="fas fa-ghost"></i> Zero-KYC Storage Protocol</span>
-                <h1>Secure cloud. <br>100% Free.</h1>
-                <p>No credit cards. No subscription fees. Just high-speed encrypted storage for the privacy-conscious.</p>
+    <!-- Hero -->
+    <header class="container mx-auto px-6 pt-48 pb-32">
+        <div class="max-w-5xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/20 bg-blue-500/5 mb-8">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Built for photographers &amp; videographers</span>
+            </div>
 
-                <div class="vault-container">
-                    <div class="vault-header">
-                        <div>
-                            <div class="capacity-label">Current Vault Capacity</div>
-                            <div class="capacity-value mono">10<span>GB</span></div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="capacity-label" style="color: var(--success); margin-bottom: 8px;">Account Status: Active</div>
-                            <span class="status-pill">Genesis Member</span>
-                        </div>
-                    </div>
+            <h1 class="text-7xl md:text-8xl lg:text-[11rem] font-black mb-10 leading-[0.8] tracking-tighter text-white text-glow">
+                YOUR SHOTS.<br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-700">FOREVER.</span>
+            </h1>
 
-                    <div class="progress-track" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-fill"></div>
-                    </div>
+            <p class="text-slate-400 text-xl md:text-2xl max-w-2xl mb-12 leading-relaxed">
+                100GB of encrypted cloud storage — free, forever.
+                <span class="text-white">No subscriptions. No credit cards.</span>
+                Just your photos and videos, safe and always accessible.
+            </p>
 
-                    <div class="reward-grid">
-                        <div class="reward-item">
-                            <div class="reward-title">
-                                Genesis Access <span class="status-pill unlocked">Active</span>
+            <div class="flex flex-col sm:flex-row gap-4 max-w-xl">
+                <input type="email" placeholder="Enter your email"
+                       class="flex-1 bg-slate-900/40 border border-white/10 px-8 py-5 rounded-2xl outline-none focus:border-blue-500 transition text-white">
+                <a href="https://storage.jwork.ru/auth" class="btn-shine bg-blue-600 text-white font-black px-10 py-5 rounded-2xl transition shadow-2xl shadow-blue-600/20 text-center">
+                    Get Access
+                </a>
+            </div>
+            <p class="mt-5 text-slate-500 text-sm">
+                ⚠️ <strong class="text-slate-400">Note:</strong> Individual file uploads and downloads are currently limited to <strong class="text-slate-300">20 MB</strong> — we're actively working to raise this limit.
+            </p>
+        </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="container mx-auto px-6 py-20">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-1">
+            <div class="p-12 glass-card rounded-t-[3rem] md:rounded-l-[3rem] md:rounded-tr-none">
+                <p class="text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Free Storage</p>
+                <h2 class="text-6xl font-black text-white tracking-tighter">100GB</h2>
+                <p class="text-slate-500 mt-6 text-sm">Every account starts with 100 GB — no referrals required.</p>
+            </div>
+            <div class="p-12 glass-card bg-blue-600/5 border-x-0 md:border-x border-white/5">
+                <p class="text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Encryption</p>
+                <h2 class="text-6xl font-black italic text-white tracking-tighter">AES‑256</h2>
+                <p class="text-slate-500 mt-6 text-sm">Military-grade encryption at rest and in transit.</p>
+            </div>
+            <div class="p-12 glass-card rounded-b-[3rem] md:rounded-r-[3rem] md:rounded-bl-none">
+                <p class="text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6">Latency</p>
+                <h2 class="text-6xl font-black text-white tracking-tighter">&lt;20ms</h2>
+                <p class="text-slate-500 mt-6 text-sm">Direct-fiber backbone peering for fast transfers.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="container mx-auto px-6 py-32">
+        <div class="relative rounded-[4rem] overflow-hidden border border-white/5 bg-slate-900/20 p-8 md:p-20">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="text-5xl font-black text-white tracking-tighter mb-8">Not just a drive.<br>A photographer's vault.</h2>
+                    <div class="space-y-12">
+                        <div class="flex gap-8">
+                            <span class="text-5xl font-black text-blue-900/50">01</span>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Immutable Backups</h4>
+                                <p class="text-slate-400">Once it's in Everfast, it stays exactly as it was. No compression, no data rot, ever.</p>
                             </div>
-                            <p class="reward-desc">Initial 10GB with zero-knowledge AES-256 encryption.</p>
                         </div>
-
-                        <div class="reward-item locked">
-                            <div class="reward-title">
-                                Peer Referral <span class="status-pill">+5GB</span>
+                        <div class="flex gap-8">
+                            <span class="text-5xl font-black text-blue-900/50">02</span>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Photos &amp; Videos First</h4>
+                                <p class="text-slate-400">Optimized for JPEG, RAW, PNG, MP4, MOV and more. Your whole shoot, in one place.</p>
                             </div>
-                            <p class="reward-desc">Invite a peer to the Jwork network to expand your base vault.</p>
+                        </div>
+                        <div class="flex gap-8">
+                            <span class="text-5xl font-black text-blue-900/50">03</span>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Zero-Knowledge</h4>
+                                <p class="text-slate-400">Privacy is the foundation of the <a href="https://projects.jwork.ru" class="text-blue-400 hover:underline">Jwork</a> group. We can't see your files.</p>
+                            </div>
                         </div>
                     </div>
-
-                    <a href="https://storage.jwork.ru/auth" class="btn btn-primary" data-auth-link>Claim Your Vault</a>
-                    <div class="referral-note">
-                        <i class="fas fa-info-circle"></i> Max referral capacity: 100GB
+                </div>
+                <div class="relative">
+                    <div class="absolute inset-0 bg-blue-600/20 blur-[100px]"></div>
+                    <div class="relative glass-card p-1 border-white/10 rounded-3xl transform rotate-2">
+                        <div class="bg-slate-950 rounded-[1.4rem] p-10">
+                            <div class="flex justify-between items-end mb-4">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Vault Usage</span>
+                                <span class="text-blue-400 font-mono text-xs">3%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 h-1.5 rounded-full mb-4">
+                                <div class="bg-blue-500 h-full w-[3%] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                            </div>
+                            <p class="text-slate-500 text-xs mb-8">3.2 GB / 100 GB used</p>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="h-8 bg-blue-500/30 rounded"></div>
+                                <div class="h-8 bg-blue-500/20 rounded"></div>
+                                <div class="h-8 bg-blue-500/40 animate-pulse rounded"></div>
+                                <div class="h-8 bg-slate-800 rounded"></div>
+                            </div>
+                        </div>
                     </div>
-                    
                 </div>
             </div>
-        </header>
+        </div>
+    </section>
 
-        <section id="features" class="features">
-            <div class="container">
-                <div class="feature-grid">
-                    <div class="feature-card">
-                        <i class="fas fa-user-secret"></i>
-                        <h3>Truly Anonymous</h3>
-                        <p>No names, no cards, no tracking. Your identity stays off the grid.</p>
-                    </div>
-                    <div class="feature-card">
-                        <i class="fas fa-lock"></i>
-                        <h3>Zero-Knowledge</h3>
-                        <p>We can't see your data. Your private keys are generated and stored locally on your device.</p>
-                    </div>
-                    <div class="feature-card">
-                        <i class="fas fa-bolt"></i>
-                        <h3>Always Free</h3>
-                        <p>No hidden tiers or paywalls. Grow your storage through community referrals, not your wallet.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 JWORK. All data is client-side encrypted before upload.</p>
-            <div class="social-links">
-            </div>
+    <!-- CTA Footer -->
+    <footer class="container mx-auto px-6 pb-20">
+        <div class="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[3rem] p-16 md:p-24 text-center">
+            <h2 class="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter">Your photos deserve better.</h2>
+            <a href="https://storage.jwork.ru/auth" class="inline-block bg-white text-blue-900 font-black px-12 py-5 rounded-2xl text-xl hover:scale-105 transition-transform shadow-xl">
+                Claim 100GB Free
+            </a>
+            <p class="mt-8 text-blue-200/60 text-xs font-bold uppercase tracking-widest">No credit card · No referrals · Always free</p>
+        </div>
+        <div class="mt-20 flex flex-col md:flex-row justify-between items-center opacity-40">
+            <div class="text-lg font-black text-white">EVER<span class="text-blue-500">FAST</span></div>
+            <div class="text-[10px] font-bold tracking-[0.4em] uppercase">© <a href="https://projects.jwork.ru" class="hover:opacity-80">Jwork</a> Infrastructure Group</div>
         </div>
     </footer>
 
-    <script>
-        (async function () {
-            const API_BASE = "https://sparkling-math-0017.wgattr14.workers.dev";
-            const params = new URLSearchParams(window.location.search);
-            const ref = (params.get('ref') || '').trim().toUpperCase();
-            if (ref && !/^[A-Z0-9-]{4,32}$/.test(ref)) return;
-            if (!ref) return;
-
-            localStorage.setItem('jwork_pending_ref', ref);
-            document.querySelectorAll('[data-auth-link]').forEach((link) => {
-                link.href = `https://storage.jwork.ru/auth?ref=${encodeURIComponent(ref)}`;
-            });
-
-            try {
-                await fetch(`${API_BASE}/referrals/track-click`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ referral_code: ref })
-                });
-            } catch (_) {}
-        })();
-    </script>
 </body>
 </html>
