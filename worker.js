@@ -142,7 +142,7 @@ async function register(request, env) {
     if (referrers.length > 0) {
       const ref = referrers[0];
       await sbPatch(env, `users?id=eq.${referredBy}`, {
-        storage_cap: Math.min((ref.storage_cap || BASE_STORAGE) + REFERRAL_BONUS, MAX_STORAGE),
+        storage_cap: Math.min(Number(ref.storage_cap || 0) + REFERRAL_BONUS, MAX_STORAGE),
         referral_count: (ref.referral_count || 0) + 1,
       });
     }
@@ -220,7 +220,8 @@ async function uploadFile(request, env) {
   if (!tgData.ok) return jsonError('Telegram upload failed', 502, 'telegram_upload_failed');
 
   const msg = tgData.result;
-  const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || msg.photo?.[msg.photo.length - 1]?.file_id;
+  const photoFileId = Array.isArray(msg.photo) && msg.photo.length > 0 ? msg.photo[msg.photo.length - 1].file_id : null;
+  const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || photoFileId;
   const saved = await sbPost(env, 'files', {
     user_id: auth.userId,
     name: file.name,

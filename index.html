@@ -352,6 +352,7 @@
             const API_BASE = "https://sparkling-math-0017.wgattr14.workers.dev";
             const params = new URLSearchParams(window.location.search);
             const ref = (params.get('ref') || '').trim().toUpperCase();
+            if (ref && !/^[A-Z0-9-]{4,32}$/.test(ref)) return;
             if (!ref) return;
 
             localStorage.setItem('jwork_pending_ref', ref);
