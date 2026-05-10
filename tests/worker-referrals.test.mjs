@@ -10,3 +10,16 @@ test('safeJson handles invalid payloads', () => {
 test('enc safely URL-encodes strings', () => {
   assert.equal(__testables.enc('A B+C'), 'A%20B%2BC');
 });
+
+test('parseStorageCapBytes converts GB and rejects invalid limits', () => {
+  assert.equal(__testables.parseStorageCapBytes({ storageCapGb: 1.5 }), 1610612736);
+  assert.equal(__testables.parseStorageCapBytes({ storageCapBytes: 2048 }), 2048);
+  assert.equal(__testables.parseStorageCapBytes({ storageCapGb: -1 }), null);
+  assert.equal(__testables.parseStorageCapBytes({}), null);
+});
+
+test('safeEqual compares values in a stable way', () => {
+  assert.equal(__testables.safeEqual('secret', 'secret'), true);
+  assert.equal(__testables.safeEqual('secret', 'secret2'), false);
+  assert.equal(__testables.safeEqual('abc', 'abd'), false);
+});
