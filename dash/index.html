@@ -315,7 +315,7 @@
 
     function renderReferrals() {
       const s = state.referralSummary || {};
-      const link = `${window.location.origin}/index.html?ref=${encodeURIComponent(s.referral_code || '')}`;
+      const link = `${window.location.origin}/?ref=${encodeURIComponent(s.referral_code || '')}`;
       const q = encodeURIComponent(link);
       document.getElementById('ref-link').value = link;
       document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${q}`;

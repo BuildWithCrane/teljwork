@@ -210,12 +210,13 @@ async function uploadFile(request, env) {
   else if (type.startsWith('video/')) method = 'sendVideo';
   else if (type.startsWith('audio/')) method = 'sendAudio';
 
-  const key = method === 'sendPhoto' ? 'photo' : method === 'sendVideo' ? 'video' : method === 'sendAudio' ? 'audio' : 'document';
+  const keyMap = { sendPhoto: 'photo', sendVideo: 'video', sendAudio: 'audio' };
+  const key = keyMap[method] || 'document';
   tgForm.append(key, file, file.name);
 
   const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, { method: 'POST', body: tgForm });
   const tgData = await tgRes.json();
-  if (!tgData.ok) return jsonError('Telegram upload failed', 502, 'telegram_upload_failed', tgData);
+  if (!tgData.ok) return jsonError('Telegram upload failed', 502, 'telegram_upload_failed');
 
   const msg = tgData.result;
   const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || msg.photo?.[msg.photo.length - 1]?.file_id;
@@ -310,7 +311,7 @@ async function getReferralSummary(request, env) {
 
   const referred = await sbGet(env, `users?referred_by=eq.${auth.userId}&select=id`);
   const qualified = Number(user.referral_count || 0);
-  const earnedBytes = Math.min(MAX_STORAGE, BASE_STORAGE + qualified * REFERRAL_BONUS) - BASE_STORAGE;
+  const earnedBytes = Math.min(qualified * REFERRAL_BONUS, MAX_STORAGE - BASE_STORAGE);
   const clicks = Number(await readOptionalKV(env, `refclick:${user.referral_code}`) || 0);
 
   return jsonOk({
@@ -363,7 +364,7 @@ function buildReferralMilestones(count) {
   return REFERRAL_MILESTONES.map((required) => ({
     required_referrals: required,
     reached: count >= required,
-    bonus_gb: required * (REFERRAL_BONUS / GB),
+    bonus_gb: (required * REFERRAL_BONUS) / GB,
   }));
 }
 
