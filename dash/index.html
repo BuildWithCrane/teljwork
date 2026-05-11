@@ -467,15 +467,30 @@
       return extKind === 'image' || extKind === 'video' ? extKind : '';
     }
 
+    function createSafeObjectUrl(blobLike) {
+      const url = URL.createObjectURL(blobLike);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'blob:' || parsed.origin !== window.location.origin) {
+          URL.revokeObjectURL(url);
+          return '';
+        }
+        return url;
+      } catch {
+        URL.revokeObjectURL(url);
+        return '';
+      }
+    }
+
     function openUploadPreview(file) {
       const img = document.getElementById('preview-image');
       const video = document.getElementById('preview-video');
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
       pendingUploadFile = file;
-      pendingPreviewUrl = URL.createObjectURL(file);
+      pendingPreviewUrl = createSafeObjectUrl(file);
       const kind = previewKindForFile(file);
       const safeName = String(file.name || 'media').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
-      const safePreviewUrl = pendingPreviewUrl.startsWith('blob:') ? pendingPreviewUrl : '';
+      const safePreviewUrl = pendingPreviewUrl;
       if (!safePreviewUrl || !kind) {
         clearPendingPreview();
         toast('Unable to preview this file.', true);
@@ -601,7 +616,8 @@
         if (!kind) {
           throw new Error('Unsupported preview response.');
         }
-        openedPreviewUrl = URL.createObjectURL(blob);
+        openedPreviewUrl = createSafeObjectUrl(blob);
+        if (!openedPreviewUrl) throw new Error('Preview failed');
         if (kind === 'image') {
           img.alt = `Preview of ${safeName}`;
           img.src = openedPreviewUrl;
