@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage } from '../dash/dashboard-utils.js';
+import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage, isPreviewableFile } from '../dash/dashboard-utils.js';
 
 test('safePercent handles invalid and bounded values', () => {
   assert.equal(safePercent(0, 0), 0);
@@ -46,4 +46,11 @@ test('formatStorageAmount formats binary units and unlimited', () => {
   assert.equal(formatStorageAmount(1024), '1.00 KB');
   assert.equal(formatStorageAmount(-1), 'Unlimited');
   assert.equal(isUnlimitedStorage(-1), true);
+});
+
+test('isPreviewableFile allows only image previews', () => {
+  assert.equal(isPreviewableFile({ name: 'photo.jpg', type: 'image/jpeg' }), true);
+  assert.equal(isPreviewableFile({ name: 'legacy.png', type: '' }), true);
+  assert.equal(isPreviewableFile({ name: 'doc.pdf', type: 'application/pdf' }), false);
+  assert.equal(isPreviewableFile({ name: 'movie.mp4', type: 'video/mp4' }), false);
 });
