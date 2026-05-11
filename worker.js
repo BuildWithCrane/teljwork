@@ -29,6 +29,7 @@ export default {
       if (pathname === '/files/upload' && request.method === 'POST') return uploadFile(request, env);
       if (pathname === '/files' && request.method === 'GET') return listFiles(request, env);
       if (pathname === '/files/download' && request.method === 'GET') return downloadFile(request, env);
+      if (pathname === '/files/preview-token' && request.method === 'GET') return createPreviewToken(request, env);
       if (pathname === '/files/view' && request.method === 'GET') return viewFile(request, env);
       if (pathname === '/files/delete' && request.method === 'POST') return deleteFile(request, env);
 
@@ -445,14 +446,22 @@ async function downloadFile(request, env) {
 }
 
 async function viewFile(request, env) {
-  const auth = await requireAuth(request, env, { allowQueryToken: true });
-  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-
   const { searchParams } = new URL(request.url);
   const fileId = searchParams.get('fileId');
   if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
+  const auth = await requireAuth(request, env);
+  const previewToken = String(searchParams.get('previewToken') || '').trim();
+  const previewAuth = auth ? null : (previewToken ? await verifyJWT(previewToken, env.JWT_SECRET) : null);
+  const isValidPreviewToken = Boolean(
+    previewAuth
+      && previewAuth.purpose === 'preview'
+      && String(previewAuth.fileId || '') === String(fileId)
+      && String(previewAuth.userId || ''),
+  );
+  const userId = auth?.userId || (isValidPreviewToken ? previewAuth.userId : '');
+  if (!userId) return jsonError('Unauthorized', 401, 'unauthorized');
 
-  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${enc(userId)}&select=id,name,type`);
   if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
   const file = files[0];
   if (!isPreviewableMediaFile(file)) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
@@ -462,8 +471,9 @@ async function viewFile(request, env) {
   if (!tgData.ok) return jsonError(tgData.description || 'Telegram fetch failed', 502, 'telegram_get_file_failed');
 
   const rangeHeader = request.headers.get('Range');
+  if (rangeHeader && !isValidByteRange(rangeHeader)) return jsonError('Invalid Range header', 400, 'invalid_range');
   const upstreamHeaders = {};
-  if (rangeHeader) upstreamHeaders.Range = rangeHeader;
+  if (rangeHeader) upstreamHeaders.Range = String(rangeHeader).trim();
   const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`, {
     headers: upstreamHeaders,
   });
@@ -500,6 +510,26 @@ async function viewFile(request, env) {
     status: fileResponse.status,
     headers: responseHeaders,
   });
+}
+
+async function createPreviewToken(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+
+  const { searchParams } = new URL(request.url);
+  const fileId = String(searchParams.get('fileId') || '').trim();
+  if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
+
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${enc(auth.userId)}&select=id,name,type`);
+  if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
+  if (!isPreviewableMediaFile(files[0])) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
+
+  const token = await makeJWT({
+    userId: auth.userId,
+    fileId,
+    purpose: 'preview',
+  }, env.JWT_SECRET, 90);
+  return jsonOk({ token });
 }
 
 async function deleteFile(request, env) {
@@ -570,10 +600,13 @@ async function sbDelete(env, q) {
   if (!r.ok) throw new Error(await r.text());
 }
 
-async function makeJWT(payload, secret) {
+async function makeJWT(payload, secret, expirySeconds = JWT_EXPIRY_SECONDS) {
   const encb64 = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const ttl = Number.isFinite(Number(expirySeconds)) && Number(expirySeconds) > 0
+    ? Number(expirySeconds)
+    : JWT_EXPIRY_SECONDS;
   const head = encb64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = encb64(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY_SECONDS }));
+  const body = encb64(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttl }));
   const data = `${head}.${body}`;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
@@ -593,19 +626,9 @@ async function verifyJWT(token, secret) {
   }
 }
 
-function authTokenFromRequest(request, options = {}) {
-  const auth = String(request.headers.get('Authorization') || '');
-  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
-  if (options.allowQueryToken) {
-    const token = new URL(request.url).searchParams.get('token');
-    if (token) return String(token).trim();
-  }
-  return '';
-}
-
-async function requireAuth(request, env, options = {}) {
-  const token = authTokenFromRequest(request, options);
-  return token ? verifyJWT(token, env.JWT_SECRET) : null;
+async function requireAuth(request, env) {
+  const authHeader = String(request.headers.get('Authorization') || '');
+  return authHeader.startsWith('Bearer ') ? verifyJWT(authHeader.slice(7).trim(), env.JWT_SECRET) : null;
 }
 
 async function hashPassword(password) {
@@ -675,6 +698,22 @@ function isPreviewContentType(contentType = '') {
   return mime.startsWith('image/') || mime.startsWith('video/');
 }
 
+function isValidByteRange(rangeHeader = '') {
+  const rangeValue = String(rangeHeader || '').trim();
+  if (!rangeValue.toLowerCase().startsWith('bytes=')) return false;
+  const ranges = rangeValue.slice(6).split(',');
+  if (!ranges.length) return false;
+  for (const rawPart of ranges) {
+    const part = rawPart.trim();
+    const match = part.match(/^(\d*)-(\d*)$/);
+    if (!match) return false;
+    const [, start, end] = match;
+    if (!start && !end) return false;
+    if (start && end && Number(start) > Number(end)) return false;
+  }
+  return true;
+}
+
 function jsonOk(data) {
   return new Response(JSON.stringify({ ok: true, ...data }), {
     status: 200,
@@ -694,8 +733,8 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
-  authTokenFromRequest,
   isPreviewableMediaFile,
   guessPreviewContentType,
   isPreviewContentType,
+  isValidByteRange,
 };

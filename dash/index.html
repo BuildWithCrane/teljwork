@@ -612,6 +612,9 @@
           if (!token) throw new Error('Session expired. Please log in again.');
           const streamFileId = String(file?.file_id || '').trim();
           if (!streamFileId) throw new Error('Preview failed');
+          const previewTokenResponse = await api(`/files/preview-token?fileId=${encodeURIComponent(streamFileId)}`);
+          const streamToken = String(previewTokenResponse?.token || '').trim();
+          if (!streamToken) throw new Error('Preview failed');
           const requestId = streamFileId;
           video.onloadedmetadata = () => {
             if (!openedPreviewFile || String(openedPreviewFile.file_id) !== requestId) return;
@@ -624,7 +627,7 @@
             status.classList.remove('hidden');
             toast(errMsg, true);
           };
-          const streamUrl = `${WORKER_URL}/files/view?fileId=${encodeURIComponent(streamFileId)}&token=${encodeURIComponent(token)}`;
+          const streamUrl = `${WORKER_URL}/files/view?fileId=${encodeURIComponent(streamFileId)}&previewToken=${encodeURIComponent(streamToken)}`;
           video.src = streamUrl;
           video.classList.remove('hidden');
           img.classList.add('hidden');

@@ -50,20 +50,12 @@ test('isPreviewContentType allows only image and video mime types', () => {
   assert.equal(__testables.isPreviewContentType('application/pdf'), false);
 });
 
-test('authTokenFromRequest supports bearer header and optional query token', () => {
-  const byHeader = __testables.authTokenFromRequest(new Request('https://example.com/files/view', {
-    headers: { Authorization: 'Bearer abc.def.ghi' },
-  }));
-  assert.equal(byHeader, 'abc.def.ghi');
-
-  const byQuery = __testables.authTokenFromRequest(
-    new Request('https://example.com/files/view?token=xyz'),
-    { allowQueryToken: true },
-  );
-  assert.equal(byQuery, 'xyz');
-
-  const queryBlocked = __testables.authTokenFromRequest(
-    new Request('https://example.com/files/view?token=xyz'),
-  );
-  assert.equal(queryBlocked, '');
+test('isValidByteRange accepts valid ranges and rejects malformed input', () => {
+  assert.equal(__testables.isValidByteRange('bytes=0-1024'), true);
+  assert.equal(__testables.isValidByteRange('bytes=100-'), true);
+  assert.equal(__testables.isValidByteRange('bytes=-500'), true);
+  assert.equal(__testables.isValidByteRange('bytes=0-10,20-30'), true);
+  assert.equal(__testables.isValidByteRange('bytes=10-0'), false);
+  assert.equal(__testables.isValidByteRange('items=0-10'), false);
+  assert.equal(__testables.isValidByteRange('bytes=-'), false);
 });
