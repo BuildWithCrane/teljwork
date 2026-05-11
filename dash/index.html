@@ -489,7 +489,7 @@
       pendingUploadFile = file;
       pendingPreviewUrl = createSafeObjectUrl(file);
       const kind = previewKindForFile(file);
-      const safeName = String(file.name || 'media').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+      const safeName = String(file.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
       const safePreviewUrl = pendingPreviewUrl;
       if (!safePreviewUrl || !kind) {
         clearPendingPreview();
@@ -549,8 +549,9 @@
         button.type = 'button';
         button.className = `preview-thumb${globalIdx === current ? ' active' : ''}`;
         button.dataset.previewIndex = String(globalIdx);
-        button.title = String(f.name || '');
-        button.textContent = String(f.name || '');
+        const label = String(f.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+        button.title = label;
+        button.textContent = label;
         button.onclick = () => viewPreviewAtIndex(globalIdx);
         strip.appendChild(button);
       });
@@ -587,7 +588,7 @@
       const status = document.getElementById('file-preview-status');
       const img = document.getElementById('file-preview-image');
       const video = document.getElementById('file-preview-video');
-      const safeName = String(file?.name || 'media').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+      const safeName = String(file?.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
       const galleryFiles = getPreviewableFiles();
       openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
       if (openedPreviewIndex < 0) openedPreviewIndex = 0;
