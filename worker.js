@@ -473,7 +473,7 @@ async function viewFile(request, env) {
     return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
   }
 
-  const filename = file.name ? String(file.name) : 'media.bin';
+  const filename = file.name ? String(file.name) : 'media';
   return new Response(fileResponse.body, {
     status: 200,
     headers: {

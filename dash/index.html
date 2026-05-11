@@ -428,6 +428,7 @@
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       pendingPreviewUrl = '';
       pendingUploadFile = null;
+      document.getElementById('preview-title').textContent = 'Media preview';
       const img = document.getElementById('preview-image');
       const video = document.getElementById('preview-video');
       img.removeAttribute('src');
@@ -480,6 +481,7 @@
         toast('Unable to preview this file.', true);
         return;
       }
+      document.getElementById('preview-title').textContent = kind === 'video' ? 'Video preview' : 'Image preview';
       if (kind === 'image') {
         img.alt = `Preview of ${safeName}`;
         img.src = safePreviewUrl;
@@ -525,13 +527,17 @@
       nextBtn.disabled = current >= files.length - 1;
       const start = Math.max(0, current - PREVIEW_STRIP_CONTEXT);
       const end = Math.min(files.length, start + PREVIEW_STRIP_MAX_ITEMS);
-      strip.innerHTML = files.slice(start, end).map((f, localIdx) => {
+      strip.innerHTML = '';
+      files.slice(start, end).forEach((f, localIdx) => {
         const globalIdx = start + localIdx;
-        const active = globalIdx === current ? ' active' : '';
-        return `<button type="button" class="preview-thumb${active}" data-preview-index="${globalIdx}" title="${esc(f.name)}">${esc(f.name)}</button>`;
-      }).join('');
-      strip.querySelectorAll('[data-preview-index]').forEach((el) => {
-        el.onclick = () => viewPreviewAtIndex(Number(el.dataset.previewIndex));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `preview-thumb${globalIdx === current ? ' active' : ''}`;
+        button.dataset.previewIndex = String(globalIdx);
+        button.title = String(f.name || '');
+        button.textContent = String(f.name || '');
+        button.onclick = () => viewPreviewAtIndex(globalIdx);
+        strip.appendChild(button);
       });
     }
 
