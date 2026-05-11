@@ -48,10 +48,12 @@ test('formatStorageAmount formats binary units and unlimited', () => {
   assert.equal(isUnlimitedStorage(-1), true);
 });
 
-test('isPreviewableFile allows only image previews', () => {
+test('isPreviewableFile allows image and video previews', () => {
   assert.equal(isPreviewableFile({ name: 'photo.jpg', type: 'image/jpeg' }), true);
   assert.equal(isPreviewableFile({ name: 'legacy.png', type: '' }), true);
   assert.equal(isPreviewableFile({ name: 'camera-roll.webp', type: 'application/octet-stream' }), true);
+  assert.equal(isPreviewableFile({ name: 'clip.webm', type: '' }), true);
+  assert.equal(isPreviewableFile({ name: 'trailer.bin', type: 'video/mp4' }), true);
   assert.equal(isPreviewableFile({ name: 'doc.pdf', type: 'application/pdf' }), false);
-  assert.equal(isPreviewableFile({ name: 'movie.mp4', type: 'video/mp4' }), false);
+  assert.equal(isPreviewableFile({ name: 'movie.bin', type: 'application/octet-stream' }), false);
 });
