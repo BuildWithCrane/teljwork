@@ -29,6 +29,7 @@ export default {
       if (pathname === '/files/upload' && request.method === 'POST') return uploadFile(request, env);
       if (pathname === '/files' && request.method === 'GET') return listFiles(request, env);
       if (pathname === '/files/download' && request.method === 'GET') return downloadFile(request, env);
+      if (pathname === '/files/view' && request.method === 'GET') return viewFile(request, env);
       if (pathname === '/files/delete' && request.method === 'POST') return deleteFile(request, env);
 
       return jsonError('Not found', 404, 'not_found');
@@ -443,6 +444,44 @@ async function downloadFile(request, env) {
   });
 }
 
+async function viewFile(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+
+  const { searchParams } = new URL(request.url);
+  const fileId = searchParams.get('fileId');
+  if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
+
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
+  if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
+  const file = files[0];
+  if (!isPreviewableImageFile(file)) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
+
+  const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const tgData = await tgRes.json();
+  if (!tgData.ok) return jsonError(tgData.description || 'Telegram fetch failed', 502, 'telegram_get_file_failed');
+
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`);
+  if (!fileResponse.ok) return jsonError('Telegram file download failed', 502, 'telegram_download_failed');
+
+  const contentType = fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream';
+  if (!String(contentType).toLowerCase().startsWith('image/')) {
+    return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
+  }
+
+  const filename = file.name ? String(file.name) : 'image.bin';
+  return new Response(fileResponse.body, {
+    status: 200,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename*=UTF-8''${enc(filename)}`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
 async function deleteFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
@@ -569,6 +608,14 @@ function enc(s) {
   return encodeURIComponent(String(s));
 }
 
+function isPreviewableImageFile(file = {}) {
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.startsWith('image/')) return true;
+  if (mime) return false;
+  const name = String(file?.name || '').toLowerCase();
+  return /\.(jpg|jpeg|png|gif|svg|webp)$/.test(name);
+}
+
 function jsonOk(data) {
   return new Response(JSON.stringify({ ok: true, ...data }), {
     status: 200,
@@ -588,4 +635,5 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
+  isPreviewableImageFile,
 };

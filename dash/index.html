@@ -85,6 +85,7 @@
     .preview-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:440px;width:100%}
     .preview-image-wrap{margin:12px 0;border:1px solid var(--border);background:var(--surface-accent);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px}
     #preview-image{max-width:100%;max-height:260px;display:block}
+    #file-preview-image{max-width:100%;max-height:360px;display:block}
     @media(max-width:980px){
       .span-8,.span-4,.span-6{grid-column:span 12}
       .sidebar{display:none}
@@ -200,10 +201,25 @@
     </div>
   </div>
 
+  <div id="file-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
+    <div class="preview-card" style="max-width:760px">
+      <p id="file-preview-title" class="mono">File preview</p>
+      <p class="small" id="file-preview-meta" style="margin-top:8px">-</p>
+      <p class="small" id="file-preview-status" style="margin-top:8px">Loading preview...</p>
+      <div class="preview-image-wrap">
+        <img id="file-preview-image" alt="Previewed file">
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn btn-ghost" id="file-preview-close" type="button">Close</button>
+        <button class="btn btn-primary" id="file-preview-download" type="button">Download</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"><span id="toast-msg"></span></div>
 
   <script type="module">
-    import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage } from './dashboard-utils.js';
+    import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage, isPreviewableFile } from './dashboard-utils.js';
 
     const token = localStorage.getItem('jwork_token');
     if (!token) window.location.href = '/auth/';
@@ -219,6 +235,8 @@
     };
     let pendingUploadFile = null;
     let pendingPreviewUrl = '';
+    let openedPreviewFile = null;
+    let openedPreviewUrl = '';
 
     const iconFor = (name) => {
       const t = getFileType(name);
@@ -294,8 +312,12 @@
         <tr>
           <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
           <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
-          <td class="actions"><button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
+          <td class="actions">
+            ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="View"><i class="fas fa-eye"></i></button>` : ''}
+            <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
+          </td>
         </tr>`).join('')}</tbody></table>`;
+      wrap.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => viewFileById(b.dataset.view));
       wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
     }
 
@@ -316,7 +338,8 @@
             <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
             <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
             <td class="actions">
-              <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
+              ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="View"><i class="fas fa-eye"></i></button>` : ''}
+              <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
               <button data-delete="${esc(f.id)}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
             </td>
           </tr>`).join('')}</tbody></table>`;
@@ -337,6 +360,7 @@
             if (el.checked) state.selected.add(id); else state.selected.delete(id);
           };
         });
+        wrap.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => viewFileById(b.dataset.view));
         wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
         wrap.querySelectorAll('[data-delete]').forEach((b) => b.onclick = () => deleteFile(b.dataset.delete));
       }
@@ -407,6 +431,59 @@
       }
       img.src = safePreviewUrl;
       document.getElementById('upload-preview').classList.remove('hidden');
+    }
+
+    function clearOpenedFilePreview() {
+      const status = document.getElementById('file-preview-status');
+      const img = document.getElementById('file-preview-image');
+      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
+      openedPreviewUrl = '';
+      openedPreviewFile = null;
+      status.textContent = 'Loading preview...';
+      status.classList.remove('hidden');
+      img.removeAttribute('src');
+      document.getElementById('file-preview').classList.add('hidden');
+    }
+
+    async function openFilePreview(file) {
+      if (!isPreviewableFile(file)) return toast('This file type cannot be previewed yet.', true);
+      const preview = document.getElementById('file-preview');
+      const status = document.getElementById('file-preview-status');
+      const img = document.getElementById('file-preview-image');
+      const safeName = String(file?.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
+      document.getElementById('file-preview-title').textContent = safeName;
+      document.getElementById('file-preview-meta').textContent = `${safeName} · ${formatStorageAmount(Number(file?.size || 0))}`;
+      clearOpenedFilePreview();
+      openedPreviewFile = file;
+      preview.classList.remove('hidden');
+      status.textContent = 'Loading preview...';
+      status.classList.remove('hidden');
+      try {
+        const res = await fetch(`${WORKER_URL}/files/view?fileId=${encodeURIComponent(file.file_id)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: 'Preview failed' }));
+          throw new Error(data.error || `Preview failed (${res.status})`);
+        }
+        const blob = await res.blob();
+        if (!String(blob.type || '').toLowerCase().startsWith('image/')) {
+          throw new Error('Unsupported preview response.');
+        }
+        openedPreviewUrl = URL.createObjectURL(blob);
+        img.alt = `Preview of ${safeName}`;
+        img.src = openedPreviewUrl;
+        status.classList.add('hidden');
+      } catch (e) {
+        clearOpenedFilePreview();
+        toast(e.message || 'Preview failed', true);
+      }
+    }
+
+    function viewFileById(id) {
+      const file = state.files.find((f) => String(f.id) === String(id));
+      if (!file) return toast('File not found', true);
+      openFilePreview(file);
     }
 
     async function submitUpload(file) {
@@ -535,7 +612,15 @@
         toast(e.message || 'Upload failed', true);
       }
     };
-    window.addEventListener('beforeunload', clearPendingPreview);
+    document.getElementById('file-preview-close').onclick = clearOpenedFilePreview;
+    document.getElementById('file-preview-download').onclick = async () => {
+      if (!openedPreviewFile) return clearOpenedFilePreview();
+      await downloadFile(openedPreviewFile.file_id, openedPreviewFile.name);
+    };
+    window.addEventListener('beforeunload', () => {
+      clearPendingPreview();
+      clearOpenedFilePreview();
+    });
 
     setRoute(location.hash.replace('#', '') || 'overview');
     refreshAll();
