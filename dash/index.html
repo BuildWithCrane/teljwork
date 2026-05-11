@@ -397,7 +397,8 @@
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
       pendingUploadFile = file;
       pendingPreviewUrl = URL.createObjectURL(file);
-      img.alt = `Preview of ${file.name}`;
+      const safeName = String(file.name || 'image').replace(/[\u0000-\u001f\u007f<>"']/g, '').trim() || 'image';
+      img.alt = `Preview of ${safeName}`;
       img.src = pendingPreviewUrl;
       document.getElementById('upload-preview').classList.remove('hidden');
     }

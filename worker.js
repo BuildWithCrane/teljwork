@@ -7,6 +7,7 @@ const CORS_HEADERS = {
 
 const GB = 1073741824;
 const UNLIMITED_STORAGE_CAP = -1;
+const UNLIMITED_STORAGE_ALIASES = ['unlimited', '∞', 'inf', 'infinite'];
 const BASE_STORAGE = 50 * GB;
 const FILE_LIMIT = 20 * 1024 * 1024;
 const JWT_EXPIRY_SECONDS = 86400 * 30;
@@ -102,9 +103,10 @@ function serveAdminPage() {
     let users = [];
 
     const GB = 1073741824;
-    const isUnlimited = (bytes) => Number.isFinite(Number(bytes)) && Number(bytes) < 0;
+    const UNLIMITED_STORAGE_ALIASES = ${JSON.stringify(UNLIMITED_STORAGE_ALIASES)};
+    const isUnlimitedStorage = (bytes) => Number.isFinite(Number(bytes)) && Number(bytes) < 0;
     function formatStorage(bytes) {
-      if (isUnlimited(bytes)) return 'Unlimited';
+      if (isUnlimitedStorage(bytes)) return 'Unlimited';
       const n = Number.isFinite(Number(bytes)) ? Math.max(0, Number(bytes)) : 0;
       if (n >= 1024 * GB) return (n / (1024 * GB)).toFixed(2) + ' TB';
       if (n >= GB) return (n / GB).toFixed(2) + ' GB';
@@ -131,14 +133,14 @@ function serveAdminPage() {
 
       body.innerHTML = users.map((u) => {
         const id = esc(u.id);
-        const capUnlimited = isUnlimited(u.storage_cap);
+        const capUnlimited = isUnlimitedStorage(u.storage_cap);
         const limitGb = capUnlimited ? 'unlimited' : Number((Number(u.storage_cap || 0) / GB).toFixed(2));
         return '<tr>' +
           '<td>' + esc(u.email || '-') + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_used) + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
           '<td><div class="row">' +
-          '<input type="text" inputmode="decimal" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
+          '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
           '<button data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '</tr>';
@@ -151,7 +153,7 @@ function serveAdminPage() {
           const raw = String((input && input.value) || '').trim();
           const lower = raw.toLowerCase();
           let payload;
-          if (lower === 'unlimited' || lower === '∞' || lower === 'inf' || lower === 'infinite') {
+          if (UNLIMITED_STORAGE_ALIASES.includes(lower)) {
             payload = { userId, storageCapUnlimited: true };
           } else {
             const capGb = Number(raw);
@@ -253,7 +255,11 @@ async function updateUserStorageLimit(request, env) {
 }
 
 function parseStorageCapBytes(body) {
-  if (body && (body.storageCapUnlimited === true || String(body.storageCap || '').trim().toLowerCase() === 'unlimited')) {
+  if (body && body.storageCapUnlimited === true) {
+    return UNLIMITED_STORAGE_CAP;
+  }
+
+  if (body && UNLIMITED_STORAGE_ALIASES.includes(String(body.storageCap || '').trim().toLowerCase())) {
     return UNLIMITED_STORAGE_CAP;
   }
 
