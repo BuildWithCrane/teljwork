@@ -1,12 +1,12 @@
 /* Cloudflare Worker */
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': 'https://storage.jwork.ru',
+  'Access-Control-Allow-Origin': 'https://everfast.imgfiles.net',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Password',
 };
 
 const GB = 1073741824;
-const BASE_STORAGE = 100 * GB;
+const BASE_STORAGE = 50 * GB;
 const FILE_LIMIT = 20 * 1024 * 1024;
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
