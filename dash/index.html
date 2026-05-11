@@ -86,6 +86,11 @@
     .preview-image-wrap{margin:12px 0;border:1px solid var(--border);background:var(--surface-accent);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px}
     #preview-image{max-width:100%;max-height:260px;display:block}
     #file-preview-image{max-width:100%;max-height:360px;display:block}
+    .preview-nav{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
+    .preview-nav .btn{flex:1}
+    .preview-strip{display:flex;gap:8px;overflow:auto;padding:4px 0 2px}
+    .preview-thumb{border:1px solid var(--border);border-radius:10px;background:var(--surface-accent);color:var(--muted);cursor:pointer;padding:6px 10px;font-size:.76rem;white-space:nowrap}
+    .preview-thumb.active{border-color:var(--primary);color:#fff}
     @media(max-width:980px){
       .span-8,.span-4,.span-6{grid-column:span 12}
       .sidebar{display:none}
@@ -203,12 +208,17 @@
 
   <div id="file-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
     <div class="preview-card" style="max-width:760px">
-      <p id="file-preview-title" class="mono">File preview</p>
+      <p id="file-preview-title" class="mono">Gallery</p>
       <p class="small" id="file-preview-meta" style="margin-top:8px">-</p>
       <p class="small" id="file-preview-status" style="margin-top:8px">Loading preview...</p>
       <div class="preview-image-wrap">
         <img id="file-preview-image" alt="Previewed file">
       </div>
+      <div class="preview-nav">
+        <button class="btn btn-ghost" id="file-preview-prev" type="button"><i class="fas fa-chevron-left"></i> Previous</button>
+        <button class="btn btn-ghost" id="file-preview-next" type="button">Next <i class="fas fa-chevron-right"></i></button>
+      </div>
+      <div class="preview-strip" id="file-preview-strip" aria-label="Gallery files"></div>
       <div class="row" style="justify-content:flex-end">
         <button class="btn btn-ghost" id="file-preview-close" type="button">Close</button>
         <button class="btn btn-primary" id="file-preview-download" type="button">Download</button>
@@ -237,6 +247,9 @@
     let pendingPreviewUrl = '';
     let openedPreviewFile = null;
     let openedPreviewUrl = '';
+    let openedPreviewIndex = -1;
+    const PREVIEW_STRIP_CONTEXT = 3;
+    const PREVIEW_STRIP_MAX_ITEMS = 7;
 
     const iconFor = (name) => {
       const t = getFileType(name);
@@ -313,7 +326,7 @@
           <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
           <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
           <td class="actions">
-            ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="View"><i class="fas fa-eye"></i></button>` : ''}
+            ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Open gallery"><i class="fas fa-images"></i></button>` : ''}
             <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
           </td>
         </tr>`).join('')}</tbody></table>`;
@@ -338,7 +351,7 @@
             <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
             <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
             <td class="actions">
-              ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="View"><i class="fas fa-eye"></i></button>` : ''}
+              ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Open gallery"><i class="fas fa-images"></i></button>` : ''}
               <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
               <button data-delete="${esc(f.id)}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
             </td>
@@ -416,6 +429,13 @@
       document.getElementById('upload-preview').classList.add('hidden');
     }
 
+    function clearOpenedPreviewMedia() {
+      const img = document.getElementById('file-preview-image');
+      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
+      openedPreviewUrl = '';
+      img.removeAttribute('src');
+    }
+
     function openImagePreview(file) {
       const img = document.getElementById('preview-image');
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
@@ -435,14 +455,69 @@
 
     function clearOpenedFilePreview() {
       const status = document.getElementById('file-preview-status');
-      const img = document.getElementById('file-preview-image');
-      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
-      openedPreviewUrl = '';
+      clearOpenedPreviewMedia();
       openedPreviewFile = null;
+      openedPreviewIndex = -1;
       status.textContent = 'Loading preview...';
       status.classList.remove('hidden');
-      img.removeAttribute('src');
+      document.getElementById('file-preview-strip').innerHTML = '';
       document.getElementById('file-preview').classList.add('hidden');
+      window.removeEventListener('keydown', handlePreviewKeydown);
+    }
+
+    function getPreviewableFiles() {
+      return state.files.filter((file) => isPreviewableFile(file));
+    }
+
+    function renderOpenedPreviewGallery() {
+      const files = getPreviewableFiles();
+      const prevBtn = document.getElementById('file-preview-prev');
+      const nextBtn = document.getElementById('file-preview-next');
+      const strip = document.getElementById('file-preview-strip');
+      const current = openedPreviewIndex;
+      if (!files.length || current < 0) {
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        strip.innerHTML = '';
+        return;
+      }
+      prevBtn.disabled = current <= 0;
+      nextBtn.disabled = current >= files.length - 1;
+      const start = Math.max(0, current - PREVIEW_STRIP_CONTEXT);
+      const end = Math.min(files.length, start + PREVIEW_STRIP_MAX_ITEMS);
+      strip.innerHTML = files.slice(start, end).map((f, localIdx) => {
+        const globalIdx = start + localIdx;
+        const active = globalIdx === current ? ' active' : '';
+        return `<button type="button" class="preview-thumb${active}" data-preview-index="${globalIdx}" title="${esc(f.name)}">${esc(f.name)}</button>`;
+      }).join('');
+      strip.querySelectorAll('[data-preview-index]').forEach((el) => {
+        el.onclick = () => viewPreviewAtIndex(Number(el.dataset.previewIndex));
+      });
+    }
+
+    function viewPreviewAtIndex(index) {
+      const files = getPreviewableFiles();
+      if (!files.length) return toast('No previewable files available.', true);
+      const safeIndex = Math.max(0, Math.min(files.length - 1, Number(index) || 0));
+      const target = files[safeIndex];
+      if (!target) return toast('Preview target unavailable.', true);
+      openFilePreview(target);
+    }
+
+    function handlePreviewKeydown(event) {
+      if (document.getElementById('file-preview').classList.contains('hidden')) return;
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        viewPreviewAtIndex(openedPreviewIndex - 1);
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        viewPreviewAtIndex(openedPreviewIndex + 1);
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        clearOpenedFilePreview();
+      }
     }
 
     async function openFilePreview(file) {
@@ -451,13 +526,21 @@
       const status = document.getElementById('file-preview-status');
       const img = document.getElementById('file-preview-image');
       const safeName = String(file?.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
-      document.getElementById('file-preview-title').textContent = safeName;
+      const galleryFiles = getPreviewableFiles();
+      openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
+      if (openedPreviewIndex < 0) openedPreviewIndex = 0;
+      document.getElementById('file-preview-title').textContent = galleryFiles.length > 1
+        ? `Gallery ${openedPreviewIndex + 1}/${galleryFiles.length}`
+        : safeName;
       document.getElementById('file-preview-meta').textContent = `${safeName} · ${formatStorageAmount(Number(file?.size || 0))}`;
-      clearOpenedFilePreview();
+      clearOpenedPreviewMedia();
       openedPreviewFile = file;
       preview.classList.remove('hidden');
+      window.removeEventListener('keydown', handlePreviewKeydown);
+      window.addEventListener('keydown', handlePreviewKeydown);
       status.textContent = 'Loading preview...';
       status.classList.remove('hidden');
+      renderOpenedPreviewGallery();
       try {
         const res = await fetch(`${WORKER_URL}/files/view?fileId=${encodeURIComponent(file.file_id)}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -475,8 +558,10 @@
         img.src = openedPreviewUrl;
         status.classList.add('hidden');
       } catch (e) {
-        clearOpenedFilePreview();
-        toast(e.message || 'Preview failed', true);
+        const errMsg = e.message || 'Preview failed';
+        status.textContent = errMsg;
+        status.classList.remove('hidden');
+        toast(errMsg, true);
       }
     }
 
@@ -613,6 +698,8 @@
       }
     };
     document.getElementById('file-preview-close').onclick = clearOpenedFilePreview;
+    document.getElementById('file-preview-prev').onclick = () => viewPreviewAtIndex(openedPreviewIndex - 1);
+    document.getElementById('file-preview-next').onclick = () => viewPreviewAtIndex(openedPreviewIndex + 1);
     document.getElementById('file-preview-download').onclick = async () => {
       if (!openedPreviewFile) return clearOpenedFilePreview();
       await downloadFile(openedPreviewFile.file_id, openedPreviewFile.name);

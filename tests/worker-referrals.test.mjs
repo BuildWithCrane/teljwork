@@ -30,6 +30,7 @@ test('safeEqual compares values in a stable way', () => {
 test('isPreviewableImageFile gates inline previews to images', () => {
   assert.equal(__testables.isPreviewableImageFile({ name: 'photo.jpg', type: 'image/jpeg' }), true);
   assert.equal(__testables.isPreviewableImageFile({ name: 'legacy.webp', type: '' }), true);
+  assert.equal(__testables.isPreviewableImageFile({ name: 'camera-roll.png', type: 'application/octet-stream' }), true);
   assert.equal(__testables.isPreviewableImageFile({ name: 'doc.pdf', type: 'application/pdf' }), false);
   assert.equal(__testables.isPreviewableImageFile({ name: 'clip.mp4', type: 'video/mp4' }), false);
 });

@@ -464,7 +464,11 @@ async function viewFile(request, env) {
   const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`);
   if (!fileResponse.ok) return jsonError('Telegram file download failed', 502, 'telegram_download_failed');
 
-  const contentType = fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream';
+  const upstreamContentType = fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream';
+  const guessedImageType = guessImageContentType(file.name);
+  const contentType = String(upstreamContentType).toLowerCase().startsWith('image/')
+    ? upstreamContentType
+    : (guessedImageType || upstreamContentType);
   if (!String(contentType).toLowerCase().startsWith('image/')) {
     return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
   }
@@ -608,12 +612,31 @@ function enc(s) {
   return encodeURIComponent(String(s));
 }
 
+const IMAGE_MIME_BY_EXTENSION = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+function imageExtensionFor(name = '') {
+  const lower = String(name).toLowerCase().trim();
+  if (!lower.includes('.')) return '';
+  const ext = lower.split('.').pop();
+  return IMAGE_MIME_BY_EXTENSION[ext] ? ext : '';
+}
+
 function isPreviewableImageFile(file = {}) {
   const mime = String(file?.type || '').toLowerCase();
   if (mime.startsWith('image/')) return true;
-  if (mime) return false;
-  const name = String(file?.name || '').toLowerCase();
-  return /\.(jpg|jpeg|png|gif|svg|webp)$/.test(name);
+  return Boolean(imageExtensionFor(file?.name || ''));
+}
+
+function guessImageContentType(name = '') {
+  const ext = imageExtensionFor(name);
+  return ext ? IMAGE_MIME_BY_EXTENSION[ext] : '';
 }
 
 function jsonOk(data) {
