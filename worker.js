@@ -138,7 +138,7 @@ function serveAdminPage() {
           '<td class="mono">' + formatStorage(u.storage_used) + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
           '<td><div class="row">' +
-          '<input type="text" inputmode="decimal" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
+          '<input type="text" inputmode="decimal" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
           '<button data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '</tr>';
@@ -160,11 +160,6 @@ function serveAdminPage() {
               return;
             }
             payload = { userId, storageCapGb: capGb };
-          }
-
-          if (!payload) {
-            setStatus('Invalid storage value.', 'error');
-            return;
           }
 
           btn.disabled = true;

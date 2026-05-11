@@ -229,6 +229,7 @@
       if (t === 'audio') return 'fa-file-audio';
       return 'fa-file-alt';
     };
+    const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
 
     function toast(msg, isErr = false) {
       const t = document.getElementById('toast');
@@ -291,7 +292,7 @@
       }
       wrap.innerHTML = `<table><thead><tr><th>Name</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map((f) => `
         <tr>
-          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
+          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
           <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
           <td class="actions"><button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
         </tr>`).join('')}</tbody></table>`;
@@ -310,8 +311,8 @@
         wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${pageData.items.map((f) => `
           <tr>
             <td><input type="checkbox" data-select="${f.id}" ${state.selected.has(String(f.id)) ? 'checked' : ''}></td>
-            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
-            <td>${getFileType(f.name)}</td>
+            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
+            <td>${esc(getFileType(f.name))}</td>
             <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
             <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
             <td class="actions">
@@ -396,6 +397,7 @@
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
       pendingUploadFile = file;
       pendingPreviewUrl = URL.createObjectURL(file);
+      img.alt = `Preview of ${file.name}`;
       img.src = pendingPreviewUrl;
       document.getElementById('upload-preview').classList.remove('hidden');
     }
