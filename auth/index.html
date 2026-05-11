@@ -1,94 +1,118 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Everfast | Access</title>
+    <title>ARK | Secure Access</title>
     <script>
-  (function() {
-    var canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 64;
-    var ctx = canvas.getContext('2d');
-
-    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    ctx.fillStyle = dark ? '#020617' : '#ffffff';
-    ctx.fillRect(0, 0, 64, 64);
-
-    ctx.fillStyle = dark ? '#ffffff' : '#111827';
-    ctx.font = 'bold 34px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('EF', 32, 33);
-
-    var link = document.createElement('link');
-    link.rel = 'icon';
-    link.href = canvas.toDataURL('image/png');
-    document.head.appendChild(link);
-
-    // Update if user switches OS theme mid-session
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-      ctx.fillStyle = e.matches ? '#020617' : '#ffffff';
-      ctx.fillRect(0, 0, 64, 64);
-      ctx.fillStyle = e.matches ? '#ffffff' : '#111827';
-      ctx.fillText('EF', 32, 33);
-      link.href = canvas.toDataURL('image/png');
-    });
-  })();
-</script>
+        (function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#121212';
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.fillStyle = '#ff6b00';
+            ctx.font = 'bold 34px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('AK', 32, 33);
+            var link = document.createElement('link');
+            link.rel = 'icon';
+            link.href = canvas.toDataURL('image/png');
+            document.head.appendChild(link);
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ark: '#ff6b00',
+                        'ark-bg': '#fdfdfd',
+                        'ark-dark': '#121212',
+                        'ark-border': '#ececec',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root { color-scheme: dark; }
-        body { font-family: 'Inter', sans-serif; background-color: #020617; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fdfdfd;
+            background-image: radial-gradient(#e0e0e0 1.2px, transparent 1.2px);
+            background-size: 50px 50px;
+        }
+
+        .ark-input:focus {
+            border-color: #ff6b00 !important;
+        }
+
+        .ark-shape {
+            width: 350px;
+            height: 350px;
+            border: 25px solid #121212;
+            position: fixed;
+            z-index: -1;
+            transform: rotate(45deg);
+            opacity: 0.02;
+            top: 50%;
+            left: 50%;
+            margin-top: -175px;
+            margin-left: -175px;
+        }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center text-white antialiased bg-[#020617]">
 
-    <div class="w-full max-w-md mx-4">
+<body class="min-h-screen flex items-center justify-center text-ark-dark antialiased px-4">
+
+    <div class="ark-shape"></div>
+
+    <div class="w-full max-w-md">
         <!-- Logo -->
-        <div class="text-center mb-8">
-            <a href="/" class="text-2xl font-black tracking-tighter text-white">
-                EVER<span class="text-blue-500">FAST</span>
-            </a>
+        <div class="text-center mb-10">
+            <a href="/" class="text-3xl font-black tracking-[4px] text-ark-dark">ARK</a>
+            <div class="text-[0.65rem] uppercase tracking-[4px] text-ark font-bold mt-2">Enterprise Storage Portal</div>
         </div>
 
-        <!-- Card -->
-        <div class="bg-slate-900/60 backdrop-blur border border-white/5 rounded-3xl p-10 shadow-2xl">
+        <!-- Auth Card -->
+        <div class="bg-white border border-ark-border rounded-lg shadow-xl p-8 md:p-10 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-ark-dark" id="top-accent"></div>
+
             <!-- Tabs -->
-            <div class="flex bg-slate-800/60 p-1 rounded-2xl mb-8">
-                <button id="login-tab" onclick="switchMode('login')"
-                    class="flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-slate-700 text-white shadow">
+            <div class="flex border border-ark-border rounded p-1 mb-8">
+                <button id="login-tab" onclick="switchMode('login')" class="flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all bg-ark-dark text-white">
                     Sign In
                 </button>
-                <button id="signup-tab" onclick="switchMode('register')"
-                    class="flex-1 py-3 rounded-xl text-sm font-bold transition-all text-slate-400">
+                <button id="signup-tab" onclick="switchMode('register')" class="flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all text-slate-400">
                     Create Account
                 </button>
             </div>
 
-            <form id="auth-form" class="space-y-5">
+            <form id="auth-form" class="space-y-6">
                 <div>
-                    <label class="block text-[0.7rem] font-bold uppercase tracking-wider text-slate-400 mb-2">Email</label>
-                    <input type="email" id="email" placeholder="you@example.com" required
-                        class="w-full bg-slate-800/60 border border-white/8 px-4 py-4 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 transition text-sm">
+                    <label class="block text-[0.7rem] font-bold uppercase tracking-wider text-slate-500 mb-2">Email Address</label>
+                    <input type="email" id="email" placeholder="name@company.com" required class="ark-input w-full bg-slate-50 border border-ark-border px-4 py-3.5 rounded font-medium text-ark-dark placeholder-slate-300 outline-none transition text-sm">
                 </div>
                 <div>
-                    <label class="block text-[0.7rem] font-bold uppercase tracking-wider text-slate-400 mb-2">Password</label>
-                    <input type="password" id="password" placeholder="Min. 8 characters" required
-                        class="w-full bg-slate-800/60 border border-white/8 px-4 py-4 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 transition text-sm">
+                    <label class="block text-[0.7rem] font-bold uppercase tracking-wider text-slate-500 mb-2">Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required class="ark-input w-full bg-slate-50 border border-ark-border px-4 py-3.5 rounded font-medium text-ark-dark placeholder-slate-300 outline-none transition text-sm">
                 </div>
-                <button type="submit" id="btn-submit"
-                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl transition text-sm mt-2">
-                    Access Vault
+                <button type="submit" id="btn-submit" class="w-full bg-ark-dark hover:bg-slate-800 text-white font-bold py-4 rounded transition-all text-[0.75rem] uppercase tracking-[2px] mt-2">
+                    Sign In
                 </button>
             </form>
 
-            <div id="msg" class="mt-5 text-sm min-h-[1.25rem] text-center"></div>
+            <div id="msg" class="mt-6 text-[0.7rem] font-semibold tracking-wide min-h-[1.25rem] text-center"></div>
         </div>
 
-        <p class="text-center text-slate-600 text-xs mt-6">
-            © <a href="https://projects.jwork.ru" class="hover:text-slate-400 transition">Jwork</a> Infrastructure Group
+        <p class="text-center text-slate-400 text-[0.65rem] font-medium tracking-widest mt-8 uppercase">
+            © 2026 ARK CLOUD SYSTEMS. All rights reserved. <br>
+            <span class="opacity-50">Authorized Access Only.</span>
         </p>
     </div>
 
@@ -104,13 +128,13 @@
             const btn = document.getElementById('btn-submit');
 
             if (mode === 'login') {
-                loginTab.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-slate-700 text-white shadow';
-                signupTab.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all text-slate-400';
-                btn.textContent = 'Access Vault';
+                loginTab.className = 'flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all bg-ark-dark text-white';
+                signupTab.className = 'flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all text-slate-400';
+                btn.textContent = 'Sign In';
             } else {
-                signupTab.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-slate-700 text-white shadow';
-                loginTab.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all text-slate-400';
-                btn.textContent = 'Create Account';
+                signupTab.className = 'flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all bg-ark-dark text-white';
+                loginTab.className = 'flex-1 py-2 text-[0.7rem] uppercase tracking-wider font-bold transition-all text-slate-400';
+                btn.textContent = 'Register Account';
             }
             document.getElementById('msg').textContent = '';
         }
@@ -120,8 +144,8 @@
             const msgDiv = document.getElementById('msg');
             const btn = document.getElementById('btn-submit');
 
-            msgDiv.className = 'mt-5 text-sm min-h-[1.25rem] text-center text-slate-400';
-            msgDiv.textContent = 'Processing…';
+            msgDiv.className = 'mt-6 text-[0.7rem] font-semibold text-slate-500 text-center';
+            msgDiv.textContent = 'Verifying credentials...';
             btn.disabled = true;
 
             const body = {
@@ -132,28 +156,31 @@
             try {
                 const res = await fetch(`${API_BASE}/auth/${currentMode}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(body),
                 });
 
                 const data = await res.json();
 
                 if (data.ok) {
-                    msgDiv.className = 'mt-5 text-sm min-h-[1.25rem] text-center text-green-400';
-                    msgDiv.textContent = 'Success! Redirecting…';
+                    msgDiv.className = 'mt-6 text-[0.7rem] font-bold text-ark text-center uppercase';
+                    msgDiv.textContent = 'Authentication Successful. Redirecting...';
                     localStorage.setItem('jwork_token', data.token);
                     setTimeout(() => window.location.href = '/dash/', 800);
                 } else {
-                    msgDiv.className = 'mt-5 text-sm min-h-[1.25rem] text-center text-red-400';
-                    msgDiv.textContent = data.error || 'Something went wrong.';
+                    msgDiv.className = 'mt-6 text-[0.7rem] font-bold text-red-600 text-center uppercase';
+                    msgDiv.textContent = data.error || 'Access Denied.';
                     btn.disabled = false;
                 }
             } catch {
-                msgDiv.className = 'mt-5 text-sm min-h-[1.25rem] text-center text-red-400';
-                msgDiv.textContent = 'Could not reach the server. Please try again.';
+                msgDiv.className = 'mt-6 text-[0.7rem] font-bold text-red-600 text-center uppercase';
+                msgDiv.textContent = 'Server Connection Error.';
                 btn.disabled = false;
             }
         };
     </script>
 </body>
+
 </html>
