@@ -1,0 +1,8 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Hull -->
+  <path d="M20 30L50 15L80 30V70L50 85L20 70V30Z" stroke="black" stroke-width="8" stroke-linejoin="round"/>
+  <!-- The Core Ark -->
+  <path d="M50 35L65 65H35L50 35Z" fill="#ff6b00"/>
+  <!-- Structural Brace -->
+  <path d="M35 65L20 70M65 65L80 70M50 35V15" stroke="black" stroke-width="4" stroke-linecap="round"/>
+</svg>
