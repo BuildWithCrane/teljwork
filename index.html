@@ -33,6 +33,18 @@
             line-height: 1.6;
         }
 
+        /* --- TOP NOTICE BAR --- */
+        .network-notice {
+            background: var(--accent);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            padding: 8px;
+        }
+
         /* --- NAVIGATION --- */
         nav {
             position: sticky;
@@ -195,7 +207,7 @@
             width: 100%;
             padding: 60px 8%;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 40px;
         }
 
@@ -329,17 +341,15 @@
             .nav-cta-desktop {
                 display: none;
             }
-
-            .content-grid {
-                display: flex;
-                flex-direction: column;
-                gap: 40px;
-            }
         }
     </style>
 </head>
 
 <body>
+
+    <div class="network-notice">
+        Network Advisory: Temporary 20MB Transfer Limit in Effect. Scaling in progress.
+    </div>
 
     <div class="grid-bg"></div>
 
@@ -386,6 +396,11 @@
             <span class="label">Payload Limit</span>
         </div>
         <div class="stat-item">
+            <i class="fas fa-tower-broadcast"></i>
+            <span class="val">20MB</span>
+            <span class="label">Transfer Cap (Scaling)</span>
+        </div>
+        <div class="stat-item">
             <i class="fas fa-user-shield"></i>
             <span class="val">Private</span>
             <span class="label">Access Protocol</span>
@@ -423,7 +438,7 @@
     <section id="plans">
         <div class="hero-sub">The Payload Tiers</div>
         <h2 style="font-size: 2.8rem; font-weight: 900; margin: 0; letter-spacing: -1px; text-transform: uppercase; text-align: center;">Select Your Capacity</h2>
-        <p style="margin-top: 15px; color: var(--text-sub); font-weight: 500; text-align: center;">Upgrades are not available for now. Standard service remains active.</p>
+        <p style="margin-top: 15px; color: var(--text-sub); font-weight: 500; text-align: center;">Note: Transfer limits are currently capped at 20MB during network optimization.</p>
 
         <div class="price-container">
             <div class="card">
@@ -478,7 +493,6 @@
             toggle.classList.toggle('active');
             overlay.classList.toggle('active');
 
-            // Lock/Unlock scroll
             if (overlay.classList.contains('active')) {
                 document.body.style.overflow = 'hidden';
             } else {
