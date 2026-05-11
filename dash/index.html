@@ -447,6 +447,8 @@
       openedPreviewUrl = '';
       img.removeAttribute('src');
       img.classList.add('hidden');
+      video.onloadedmetadata = null;
+      video.onerror = null;
       video.pause();
       video.removeAttribute('src');
       video.load();
@@ -589,6 +591,7 @@
       const img = document.getElementById('file-preview-image');
       const video = document.getElementById('file-preview-video');
       const safeName = String(file?.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+      const sourceKind = previewKindForFile(file);
       const galleryFiles = getPreviewableFiles();
       openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
       if (openedPreviewIndex < 0) openedPreviewIndex = 0;
@@ -605,6 +608,28 @@
       status.classList.remove('hidden');
       renderOpenedPreviewGallery();
       try {
+        if (sourceKind === 'video') {
+          if (!token) throw new Error('Session expired. Please log in again.');
+          const streamFileId = String(file?.file_id || '').trim();
+          if (!streamFileId) throw new Error('Preview failed');
+          const requestId = streamFileId;
+          video.onloadedmetadata = () => {
+            if (!openedPreviewFile || String(openedPreviewFile.file_id) !== requestId) return;
+            status.classList.add('hidden');
+          };
+          video.onerror = () => {
+            if (!openedPreviewFile || String(openedPreviewFile.file_id) !== requestId) return;
+            const errMsg = 'Preview failed';
+            status.textContent = errMsg;
+            status.classList.remove('hidden');
+            toast(errMsg, true);
+          };
+          const streamUrl = `${WORKER_URL}/files/view?fileId=${encodeURIComponent(streamFileId)}&token=${encodeURIComponent(token)}`;
+          video.src = streamUrl;
+          video.classList.remove('hidden');
+          img.classList.add('hidden');
+          return;
+        }
         const res = await fetch(`${WORKER_URL}/files/view?fileId=${encodeURIComponent(file.file_id)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -613,7 +638,7 @@
           throw new Error(data.error || `Preview failed (${res.status})`);
         }
         const blob = await res.blob();
-        const kind = previewKindForBlobType(blob.type) || previewKindForFile(file);
+        const kind = previewKindForBlobType(blob.type) || sourceKind;
         if (!kind) {
           throw new Error('Unsupported preview response.');
         }

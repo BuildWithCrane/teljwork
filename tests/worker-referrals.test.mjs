@@ -49,3 +49,21 @@ test('isPreviewContentType allows only image and video mime types', () => {
   assert.equal(__testables.isPreviewContentType('application/octet-stream'), false);
   assert.equal(__testables.isPreviewContentType('application/pdf'), false);
 });
+
+test('authTokenFromRequest supports bearer header and optional query token', () => {
+  const byHeader = __testables.authTokenFromRequest(new Request('https://example.com/files/view', {
+    headers: { Authorization: 'Bearer abc.def.ghi' },
+  }));
+  assert.equal(byHeader, 'abc.def.ghi');
+
+  const byQuery = __testables.authTokenFromRequest(
+    new Request('https://example.com/files/view?token=xyz'),
+    { allowQueryToken: true },
+  );
+  assert.equal(byQuery, 'xyz');
+
+  const queryBlocked = __testables.authTokenFromRequest(
+    new Request('https://example.com/files/view?token=xyz'),
+  );
+  assert.equal(queryBlocked, '');
+});

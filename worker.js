@@ -445,7 +445,7 @@ async function downloadFile(request, env) {
 }
 
 async function viewFile(request, env) {
-  const auth = await requireAuth(request, env);
+  const auth = await requireAuth(request, env, { allowQueryToken: true });
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
 
   const { searchParams } = new URL(request.url);
@@ -461,7 +461,12 @@ async function viewFile(request, env) {
   const tgData = await tgRes.json();
   if (!tgData.ok) return jsonError(tgData.description || 'Telegram fetch failed', 502, 'telegram_get_file_failed');
 
-  const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`);
+  const rangeHeader = request.headers.get('Range');
+  const upstreamHeaders = {};
+  if (rangeHeader) upstreamHeaders.Range = rangeHeader;
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(env.BOT_TOKEN)}/${tgData.result.file_path}`, {
+    headers: upstreamHeaders,
+  });
   if (!fileResponse.ok) return jsonError('Telegram file download failed', 502, 'telegram_download_failed');
 
   const upstreamContentType = fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream';
@@ -474,15 +479,26 @@ async function viewFile(request, env) {
   }
 
   const filename = file.name ? String(file.name) : 'media';
+  const responseHeaders = {
+    ...CORS_HEADERS,
+    'Content-Type': contentType,
+    'Content-Disposition': `inline; filename*=UTF-8''${enc(filename)}`,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Accept-Ranges': fileResponse.headers.get('Accept-Ranges') || 'bytes',
+  };
+  const contentLength = fileResponse.headers.get('Content-Length');
+  if (contentLength) responseHeaders['Content-Length'] = contentLength;
+  const contentRange = fileResponse.headers.get('Content-Range');
+  if (contentRange) responseHeaders['Content-Range'] = contentRange;
+  const eTag = fileResponse.headers.get('ETag');
+  if (eTag) responseHeaders.ETag = eTag;
+  const lastModified = fileResponse.headers.get('Last-Modified');
+  if (lastModified) responseHeaders['Last-Modified'] = lastModified;
+
   return new Response(fileResponse.body, {
-    status: 200,
-    headers: {
-      ...CORS_HEADERS,
-      'Content-Type': contentType,
-      'Content-Disposition': `inline; filename*=UTF-8''${enc(filename)}`,
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    },
+    status: fileResponse.status,
+    headers: responseHeaders,
   });
 }
 
@@ -577,9 +593,19 @@ async function verifyJWT(token, secret) {
   }
 }
 
-async function requireAuth(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  return auth.startsWith('Bearer ') ? verifyJWT(auth.slice(7), env.JWT_SECRET) : null;
+function authTokenFromRequest(request, options = {}) {
+  const auth = String(request.headers.get('Authorization') || '');
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  if (options.allowQueryToken) {
+    const token = new URL(request.url).searchParams.get('token');
+    if (token) return String(token).trim();
+  }
+  return '';
+}
+
+async function requireAuth(request, env, options = {}) {
+  const token = authTokenFromRequest(request, options);
+  return token ? verifyJWT(token, env.JWT_SECRET) : null;
 }
 
 async function hashPassword(password) {
@@ -668,6 +694,7 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
+  authTokenFromRequest,
   isPreviewableMediaFile,
   guessPreviewContentType,
   isPreviewContentType,
