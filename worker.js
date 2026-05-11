@@ -455,7 +455,7 @@ async function viewFile(request, env) {
   const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
   if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
   const file = files[0];
-  if (!isPreviewableImageFile(file)) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
+  if (!isPreviewableMediaFile(file)) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
 
   const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getFile?file_id=${encodeURIComponent(fileId)}`);
   const tgData = await tgRes.json();
@@ -465,15 +465,15 @@ async function viewFile(request, env) {
   if (!fileResponse.ok) return jsonError('Telegram file download failed', 502, 'telegram_download_failed');
 
   const upstreamContentType = fileResponse.headers.get('Content-Type') || file.type || 'application/octet-stream';
-  const guessedImageType = guessImageContentType(file.name);
-  const contentType = String(upstreamContentType).toLowerCase().startsWith('image/')
+  const guessedMediaType = guessPreviewContentType(file.name);
+  const contentType = isPreviewContentType(upstreamContentType)
     ? upstreamContentType
-    : (guessedImageType || upstreamContentType);
-  if (!String(contentType).toLowerCase().startsWith('image/')) {
+    : (guessedMediaType || upstreamContentType);
+  if (!isPreviewContentType(contentType)) {
     return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
   }
 
-  const filename = file.name ? String(file.name) : 'image.bin';
+  const filename = file.name ? String(file.name) : 'media';
   return new Response(fileResponse.body, {
     status: 200,
     headers: {
@@ -612,31 +612,41 @@ function enc(s) {
   return encodeURIComponent(String(s));
 }
 
-const IMAGE_MIME_BY_EXTENSION = {
+const PREVIEW_MIME_BY_EXTENSION = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   gif: 'image/gif',
   svg: 'image/svg+xml',
   webp: 'image/webp',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska',
+  webm: 'video/webm',
 };
 
-function imageExtensionFor(name = '') {
+function previewExtensionFor(name = '') {
   const lower = String(name).toLowerCase().trim();
   if (!lower.includes('.')) return '';
   const ext = lower.split('.').pop();
-  return IMAGE_MIME_BY_EXTENSION[ext] ? ext : '';
+  return PREVIEW_MIME_BY_EXTENSION[ext] ? ext : '';
 }
 
-function isPreviewableImageFile(file = {}) {
+function isPreviewableMediaFile(file = {}) {
   const mime = String(file?.type || '').toLowerCase();
-  if (mime.startsWith('image/')) return true;
-  return Boolean(imageExtensionFor(file?.name || ''));
+  if (mime.startsWith('image/') || mime.startsWith('video/')) return true;
+  return Boolean(previewExtensionFor(file?.name || ''));
 }
 
-function guessImageContentType(name = '') {
-  const ext = imageExtensionFor(name);
-  return ext ? IMAGE_MIME_BY_EXTENSION[ext] : '';
+function guessPreviewContentType(name = '') {
+  const ext = previewExtensionFor(name);
+  return ext ? PREVIEW_MIME_BY_EXTENSION[ext] : '';
+}
+
+function isPreviewContentType(contentType = '') {
+  const mime = String(contentType || '').toLowerCase();
+  return mime.startsWith('image/') || mime.startsWith('video/');
 }
 
 function jsonOk(data) {
@@ -658,5 +668,7 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
-  isPreviewableImageFile,
+  isPreviewableMediaFile,
+  guessPreviewContentType,
+  isPreviewContentType,
 };

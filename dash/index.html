@@ -84,8 +84,10 @@
     #upload-preview{position:fixed;inset:0;background:rgba(2,6,23,.84);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
     .preview-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:440px;width:100%}
     .preview-image-wrap{margin:12px 0;border:1px solid var(--border);background:var(--surface-accent);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px}
-    #preview-image{max-width:100%;max-height:260px;display:block}
-    #file-preview-image{max-width:100%;max-height:360px;display:block}
+    #preview-image,#preview-video{max-width:100%;max-height:260px;display:block}
+    #preview-video{width:100%}
+    #file-preview-image,#file-preview-video{max-width:100%;max-height:360px;display:block}
+    #file-preview-video{width:100%}
     .preview-nav{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
     .preview-nav .btn{flex:1}
     .preview-strip{display:flex;gap:8px;overflow:auto;padding:4px 0 2px}
@@ -194,10 +196,11 @@
 
   <div id="upload-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
     <div class="preview-card">
-      <p id="preview-title" class="mono">Image preview</p>
+      <p id="preview-title" class="mono">Media preview</p>
       <p class="small" id="preview-meta" style="margin-top:8px">-</p>
       <div class="preview-image-wrap">
         <img id="preview-image" alt="Selected upload preview">
+        <video id="preview-video" class="hidden" controls preload="metadata"></video>
       </div>
       <div class="row" style="justify-content:flex-end">
         <button class="btn btn-ghost" id="preview-cancel" type="button">Cancel</button>
@@ -213,6 +216,7 @@
       <p class="small" id="file-preview-status" style="margin-top:8px">Loading preview...</p>
       <div class="preview-image-wrap">
         <img id="file-preview-image" alt="Previewed file">
+        <video id="file-preview-video" class="hidden" controls preload="metadata"></video>
       </div>
       <div class="preview-nav">
         <button class="btn btn-ghost" id="file-preview-prev" type="button"><i class="fas fa-chevron-left"></i> Previous</button>
@@ -424,32 +428,85 @@
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       pendingPreviewUrl = '';
       pendingUploadFile = null;
+      document.getElementById('preview-title').textContent = 'Media preview';
       const img = document.getElementById('preview-image');
+      const video = document.getElementById('preview-video');
       img.removeAttribute('src');
+      img.classList.add('hidden');
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.classList.add('hidden');
       document.getElementById('upload-preview').classList.add('hidden');
     }
 
     function clearOpenedPreviewMedia() {
       const img = document.getElementById('file-preview-image');
+      const video = document.getElementById('file-preview-video');
       if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
       openedPreviewUrl = '';
       img.removeAttribute('src');
+      img.classList.add('hidden');
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.classList.add('hidden');
     }
 
-    function openImagePreview(file) {
+    function previewKindForBlobType(type = '') {
+      const mime = String(type || '').toLowerCase();
+      if (mime.startsWith('image/')) return 'image';
+      if (mime.startsWith('video/')) return 'video';
+      return '';
+    }
+
+    function previewKindForFile(file = {}) {
+      const mimeKind = previewKindForBlobType(file?.type || '');
+      if (mimeKind) return mimeKind;
+      const extKind = getFileType(file?.name || '');
+      return extKind === 'image' || extKind === 'video' ? extKind : '';
+    }
+
+    function createSafeObjectUrl(blobLike) {
+      const url = URL.createObjectURL(blobLike);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'blob:' || parsed.origin !== window.location.origin) {
+          URL.revokeObjectURL(url);
+          return '';
+        }
+        return url;
+      } catch {
+        URL.revokeObjectURL(url);
+        return '';
+      }
+    }
+
+    function openUploadPreview(file) {
       const img = document.getElementById('preview-image');
+      const video = document.getElementById('preview-video');
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
       pendingUploadFile = file;
-      pendingPreviewUrl = URL.createObjectURL(file);
-      const safeName = String(file.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
-      img.alt = `Preview of ${safeName}`;
-      const safePreviewUrl = pendingPreviewUrl.startsWith('blob:') ? pendingPreviewUrl : '';
-      if (!safePreviewUrl) {
+      pendingPreviewUrl = createSafeObjectUrl(file);
+      const kind = previewKindForFile(file);
+      const safeName = String(file.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+      const safePreviewUrl = pendingPreviewUrl;
+      if (!safePreviewUrl || !kind) {
         clearPendingPreview();
-        toast('Unable to preview this image.', true);
+        toast('Unable to preview this file.', true);
         return;
       }
-      img.src = safePreviewUrl;
+      document.getElementById('preview-title').textContent = kind === 'video' ? 'Video preview' : 'Image preview';
+      if (kind === 'image') {
+        img.alt = `Preview of ${safeName}`;
+        img.src = safePreviewUrl;
+        img.classList.remove('hidden');
+        video.classList.add('hidden');
+      } else {
+        video.src = safePreviewUrl;
+        video.classList.remove('hidden');
+        img.classList.add('hidden');
+      }
       document.getElementById('upload-preview').classList.remove('hidden');
     }
 
@@ -485,13 +542,18 @@
       nextBtn.disabled = current >= files.length - 1;
       const start = Math.max(0, current - PREVIEW_STRIP_CONTEXT);
       const end = Math.min(files.length, start + PREVIEW_STRIP_MAX_ITEMS);
-      strip.innerHTML = files.slice(start, end).map((f, localIdx) => {
+      strip.innerHTML = '';
+      files.slice(start, end).forEach((f, localIdx) => {
         const globalIdx = start + localIdx;
-        const active = globalIdx === current ? ' active' : '';
-        return `<button type="button" class="preview-thumb${active}" data-preview-index="${globalIdx}" title="${esc(f.name)}">${esc(f.name)}</button>`;
-      }).join('');
-      strip.querySelectorAll('[data-preview-index]').forEach((el) => {
-        el.onclick = () => viewPreviewAtIndex(Number(el.dataset.previewIndex));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `preview-thumb${globalIdx === current ? ' active' : ''}`;
+        button.dataset.previewIndex = String(globalIdx);
+        const label = String(f.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+        button.title = label;
+        button.textContent = label;
+        button.onclick = () => viewPreviewAtIndex(globalIdx);
+        strip.appendChild(button);
       });
     }
 
@@ -525,7 +587,8 @@
       const preview = document.getElementById('file-preview');
       const status = document.getElementById('file-preview-status');
       const img = document.getElementById('file-preview-image');
-      const safeName = String(file?.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
+      const video = document.getElementById('file-preview-video');
+      const safeName = String(file?.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
       const galleryFiles = getPreviewableFiles();
       openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
       if (openedPreviewIndex < 0) openedPreviewIndex = 0;
@@ -550,12 +613,22 @@
           throw new Error(data.error || `Preview failed (${res.status})`);
         }
         const blob = await res.blob();
-        if (!String(blob.type || '').toLowerCase().startsWith('image/')) {
+        const kind = previewKindForBlobType(blob.type) || previewKindForFile(file);
+        if (!kind) {
           throw new Error('Unsupported preview response.');
         }
-        openedPreviewUrl = URL.createObjectURL(blob);
-        img.alt = `Preview of ${safeName}`;
-        img.src = openedPreviewUrl;
+        openedPreviewUrl = createSafeObjectUrl(blob);
+        if (!openedPreviewUrl) throw new Error('Preview failed');
+        if (kind === 'image') {
+          img.alt = `Preview of ${safeName}`;
+          img.src = openedPreviewUrl;
+          img.classList.remove('hidden');
+          video.classList.add('hidden');
+        } else {
+          video.src = openedPreviewUrl;
+          video.classList.remove('hidden');
+          img.classList.add('hidden');
+        }
         status.classList.add('hidden');
       } catch (e) {
         const errMsg = e.message || 'Preview failed';
@@ -585,8 +658,9 @@
         if (!file) return;
         if (file.size > 20 * 1024 * 1024) return toast('Files must be under 20MB.', true);
         try {
-          if (String(file.type || '').startsWith('image/')) {
-            openImagePreview(file);
+          const previewKind = previewKindForFile(file);
+          if (previewKind === 'image' || previewKind === 'video') {
+            openUploadPreview(file);
             return;
           }
           await submitUpload(file);

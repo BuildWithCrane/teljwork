@@ -41,8 +41,9 @@ export function getFileType(name = '') {
 
 export function isPreviewableFile(file = {}) {
   const mime = String(file?.type || '').toLowerCase();
-  if (mime.startsWith('image/')) return true;
-  return getFileType(file?.name || '') === 'image';
+  if (mime.startsWith('image/') || mime.startsWith('video/')) return true;
+  const type = getFileType(file?.name || '');
+  return type === 'image' || type === 'video';
 }
 
 export function filterAndSortFiles(files = [], options = {}) {
