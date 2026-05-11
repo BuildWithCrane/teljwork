@@ -103,8 +103,8 @@ function serveAdminPage() {
     let users = [];
 
     const GB = 1073741824;
-    const UNLIMITED_STORAGE_ALIASES = ${JSON.stringify(UNLIMITED_STORAGE_ALIASES)};
-    const isUnlimitedStorage = (bytes) => Number.isFinite(Number(bytes)) && Number(bytes) < 0;
+    const UNLIMITED_STORAGE_ALIASES = ['unlimited', '∞', 'inf', 'infinite'];
+    const isUnlimitedStorage = (bytes) => Number(bytes) < 0;
     function formatStorage(bytes) {
       if (isUnlimitedStorage(bytes)) return 'Unlimited';
       const n = Number.isFinite(Number(bytes)) ? Math.max(0, Number(bytes)) : 0;
@@ -140,7 +140,7 @@ function serveAdminPage() {
           '<td class="mono">' + formatStorage(u.storage_used) + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
           '<td><div class="row">' +
-          '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
+          '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + esc(limitGb) + '" data-cap="' + id + '" />' +
           '<button data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '</tr>';

@@ -229,7 +229,7 @@
       if (t === 'audio') return 'fa-file-audio';
       return 'fa-file-alt';
     };
-    const esc = (v) => String(v || '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
 
     function toast(msg, isErr = false) {
       const t = document.getElementById('toast');
@@ -294,7 +294,7 @@
         <tr>
           <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
           <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
-          <td class="actions"><button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
+          <td class="actions"><button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
         </tr>`).join('')}</tbody></table>`;
       wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
     }
@@ -316,8 +316,8 @@
             <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
             <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
             <td class="actions">
-              <button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
-              <button data-delete="${f.id}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
+              <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
+              <button data-delete="${esc(f.id)}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
             </td>
           </tr>`).join('')}</tbody></table>`;
 
@@ -397,9 +397,15 @@
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
       pendingUploadFile = file;
       pendingPreviewUrl = URL.createObjectURL(file);
-      const safeName = String(file.name || 'image').replace(/[\u0000-\u001f\u007f<>"']/g, '').trim() || 'image';
+      const safeName = String(file.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
       img.alt = `Preview of ${safeName}`;
-      img.src = pendingPreviewUrl;
+      const safePreviewUrl = pendingPreviewUrl.startsWith('blob:') ? pendingPreviewUrl : '';
+      if (!safePreviewUrl) {
+        clearPendingPreview();
+        toast('Unable to preview this image.', true);
+        return;
+      }
+      img.src = safePreviewUrl;
       document.getElementById('upload-preview').classList.remove('hidden');
     }
 
@@ -529,6 +535,7 @@
         toast(e.message || 'Upload failed', true);
       }
     };
+    window.addEventListener('beforeunload', clearPendingPreview);
 
     setRoute(location.hash.replace('#', '') || 'overview');
     refreshAll();
