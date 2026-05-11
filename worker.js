@@ -6,6 +6,7 @@ const CORS_HEADERS = {
 };
 
 const GB = 1073741824;
+const UNLIMITED_STORAGE_CAP = -1;
 const BASE_STORAGE = 50 * GB;
 const FILE_LIMIT = 20 * 1024 * 1024;
 const JWT_EXPIRY_SECONDS = 86400 * 30;
@@ -85,7 +86,7 @@ function serveAdminPage() {
               <th>Email</th>
               <th>Used</th>
               <th>Limit</th>
-              <th>Set new limit (GB)</th>
+              <th>Set new limit (GB or unlimited)</th>
             </tr>
           </thead>
           <tbody id="users-body">
@@ -101,7 +102,16 @@ function serveAdminPage() {
     let users = [];
 
     const GB = 1073741824;
-    const bytesToGb = (bytes) => (Number(bytes || 0) / GB).toFixed(2);
+    const isUnlimited = (bytes) => Number.isFinite(Number(bytes)) && Number(bytes) < 0;
+    function formatStorage(bytes) {
+      if (isUnlimited(bytes)) return 'Unlimited';
+      const n = Number.isFinite(Number(bytes)) ? Math.max(0, Number(bytes)) : 0;
+      if (n >= 1024 * GB) return (n / (1024 * GB)).toFixed(2) + ' TB';
+      if (n >= GB) return (n / GB).toFixed(2) + ' GB';
+      if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(2) + ' MB';
+      if (n >= 1024) return (n / 1024).toFixed(2) + ' KB';
+      return n.toFixed(0) + ' B';
+    }
     const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
 
     function setStatus(message, type = 'muted') {
@@ -121,13 +131,14 @@ function serveAdminPage() {
 
       body.innerHTML = users.map((u) => {
         const id = esc(u.id);
-        const limitGb = Number((Number(u.storage_cap || 0) / GB).toFixed(2));
+        const capUnlimited = isUnlimited(u.storage_cap);
+        const limitGb = capUnlimited ? 'unlimited' : Number((Number(u.storage_cap || 0) / GB).toFixed(2));
         return '<tr>' +
           '<td>' + esc(u.email || '-') + '</td>' +
-          '<td class="mono">' + bytesToGb(u.storage_used) + ' GB</td>' +
-          '<td class="mono">' + bytesToGb(u.storage_cap) + ' GB</td>' +
+          '<td class="mono">' + formatStorage(u.storage_used) + '</td>' +
+          '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
           '<td><div class="row">' +
-          '<input type="number" min="0" step="0.01" value="' + limitGb + '" data-cap="' + id + '" />' +
+          '<input type="text" inputmode="decimal" placeholder="1024 or unlimited" value="' + limitGb + '" data-cap="' + id + '" />' +
           '<button data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '</tr>';
@@ -137,9 +148,22 @@ function serveAdminPage() {
         btn.addEventListener('click', async () => {
           const userId = btn.getAttribute('data-save');
           const input = body.querySelector('input[data-cap="' + CSS.escape(userId) + '"]');
-          const capGb = Number(input && input.value);
-          if (!Number.isFinite(capGb) || capGb < 0) {
-            setStatus('Storage limit must be a non-negative number.', 'error');
+          const raw = String((input && input.value) || '').trim();
+          const lower = raw.toLowerCase();
+          let payload;
+          if (lower === 'unlimited' || lower === '∞' || lower === 'inf' || lower === 'infinite') {
+            payload = { userId, storageCapUnlimited: true };
+          } else {
+            const capGb = Number(raw);
+            if (!Number.isFinite(capGb) || capGb < 0) {
+              setStatus('Storage limit must be a non-negative number or "unlimited".', 'error');
+              return;
+            }
+            payload = { userId, storageCapGb: capGb };
+          }
+
+          if (!payload) {
+            setStatus('Invalid storage value.', 'error');
             return;
           }
 
@@ -151,7 +175,7 @@ function serveAdminPage() {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + adminPassword,
               },
-              body: JSON.stringify({ userId, storageCapGb: capGb }),
+              body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (!res.ok || !data.ok) throw new Error(data.error || 'Update failed');
@@ -219,13 +243,13 @@ async function updateUserStorageLimit(request, env) {
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
 
   const storageCapBytes = parseStorageCapBytes(body);
-  if (storageCapBytes === null) return jsonError('Provide storageCapGb or storageCapBytes as a non-negative number', 400, 'invalid_storage_limit');
+  if (storageCapBytes === null) return jsonError('Provide storageCapGb/storageCapBytes as a non-negative number, or set storageCapUnlimited', 400, 'invalid_storage_limit');
 
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email,storage_used,storage_cap`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
 
   const current = users[0];
-  if (storageCapBytes < Number(current.storage_used || 0)) {
+  if (storageCapBytes >= 0 && storageCapBytes < Number(current.storage_used || 0)) {
     return jsonError('New limit cannot be below current storage usage', 400, 'limit_below_usage');
   }
 
@@ -234,6 +258,10 @@ async function updateUserStorageLimit(request, env) {
 }
 
 function parseStorageCapBytes(body) {
+  if (body && (body.storageCapUnlimited === true || String(body.storageCap || '').trim().toLowerCase() === 'unlimited')) {
+    return UNLIMITED_STORAGE_CAP;
+  }
+
   if (body && Number.isFinite(Number(body.storageCapBytes))) {
     const bytes = Math.round(Number(body.storageCapBytes));
     return bytes >= 0 ? bytes : null;
@@ -338,7 +366,9 @@ async function uploadFile(request, env) {
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=storage_used,storage_cap`);
   const u = users[0];
   if (!u) return jsonError('User not found', 404, 'user_not_found');
-  if ((u.storage_used || 0) + file.size > (u.storage_cap || 0)) return jsonError('Storage full', 413, 'storage_full');
+  const cap = Number(u.storage_cap);
+  const isUnlimited = Number.isFinite(cap) && cap < 0;
+  if (!isUnlimited && (u.storage_used || 0) + file.size > (u.storage_cap || 0)) return jsonError('Storage full', 413, 'storage_full');
 
   const tgForm = new FormData();
   tgForm.append('chat_id', env.CHAT_ID);

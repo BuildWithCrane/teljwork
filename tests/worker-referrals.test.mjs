@@ -15,6 +15,8 @@ test('enc safely URL-encodes strings', () => {
 test('parseStorageCapBytes converts GB and rejects invalid limits', () => {
   assert.equal(__testables.parseStorageCapBytes({ storageCapGb: 1.5 }), 1610612736);
   assert.equal(__testables.parseStorageCapBytes({ storageCapBytes: 2048 }), 2048);
+  assert.equal(__testables.parseStorageCapBytes({ storageCapUnlimited: true }), -1);
+  assert.equal(__testables.parseStorageCapBytes({ storageCap: 'unlimited' }), -1);
   assert.equal(__testables.parseStorageCapBytes({ storageCapGb: -1 }), null);
   assert.equal(__testables.parseStorageCapBytes({}), null);
 });
