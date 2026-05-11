@@ -623,6 +623,7 @@ const IMAGE_MIME_BY_EXTENSION = {
 
 function imageExtensionFor(name = '') {
   const lower = String(name).toLowerCase().trim();
+  if (!lower.includes('.')) return '';
   const ext = lower.split('.').pop();
   return IMAGE_MIME_BY_EXTENSION[ext] ? ext : '';
 }

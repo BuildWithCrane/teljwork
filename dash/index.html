@@ -248,6 +248,8 @@
     let openedPreviewFile = null;
     let openedPreviewUrl = '';
     let openedPreviewIndex = -1;
+    const PREVIEW_STRIP_CONTEXT = 3;
+    const PREVIEW_STRIP_MAX_ITEMS = 7;
 
     const iconFor = (name) => {
       const t = getFileType(name);
@@ -427,6 +429,13 @@
       document.getElementById('upload-preview').classList.add('hidden');
     }
 
+    function clearOpenedPreviewMedia() {
+      const img = document.getElementById('file-preview-image');
+      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
+      openedPreviewUrl = '';
+      img.removeAttribute('src');
+    }
+
     function openImagePreview(file) {
       const img = document.getElementById('preview-image');
       document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
@@ -446,16 +455,14 @@
 
     function clearOpenedFilePreview() {
       const status = document.getElementById('file-preview-status');
-      const img = document.getElementById('file-preview-image');
-      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
-      openedPreviewUrl = '';
+      clearOpenedPreviewMedia();
       openedPreviewFile = null;
       openedPreviewIndex = -1;
       status.textContent = 'Loading preview...';
       status.classList.remove('hidden');
-      img.removeAttribute('src');
       document.getElementById('file-preview-strip').innerHTML = '';
       document.getElementById('file-preview').classList.add('hidden');
+      window.removeEventListener('keydown', handlePreviewKeydown);
     }
 
     function getPreviewableFiles() {
@@ -476,8 +483,8 @@
       }
       prevBtn.disabled = current <= 0;
       nextBtn.disabled = current >= files.length - 1;
-      const start = Math.max(0, current - 3);
-      const end = Math.min(files.length, start + 7);
+      const start = Math.max(0, current - PREVIEW_STRIP_CONTEXT);
+      const end = Math.min(files.length, start + PREVIEW_STRIP_MAX_ITEMS);
       strip.innerHTML = files.slice(start, end).map((f, localIdx) => {
         const globalIdx = start + localIdx;
         const active = globalIdx === current ? ' active' : '';
@@ -497,6 +504,22 @@
       openFilePreview(target);
     }
 
+    function handlePreviewKeydown(event) {
+      if (document.getElementById('file-preview').classList.contains('hidden')) return;
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        viewPreviewAtIndex(openedPreviewIndex - 1);
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        viewPreviewAtIndex(openedPreviewIndex + 1);
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        clearOpenedFilePreview();
+      }
+    }
+
     async function openFilePreview(file) {
       if (!isPreviewableFile(file)) return toast('This file type cannot be previewed yet.', true);
       const preview = document.getElementById('file-preview');
@@ -506,13 +529,15 @@
       const galleryFiles = getPreviewableFiles();
       openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
       if (openedPreviewIndex < 0) openedPreviewIndex = 0;
-      document.getElementById('file-preview-title').textContent = safeName;
+      document.getElementById('file-preview-title').textContent = galleryFiles.length > 1
+        ? `Gallery ${openedPreviewIndex + 1}/${galleryFiles.length}`
+        : safeName;
       document.getElementById('file-preview-meta').textContent = `${safeName} · ${formatStorageAmount(Number(file?.size || 0))}`;
-      if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
-      openedPreviewUrl = '';
-      img.removeAttribute('src');
+      clearOpenedPreviewMedia();
       openedPreviewFile = file;
       preview.classList.remove('hidden');
+      window.removeEventListener('keydown', handlePreviewKeydown);
+      window.addEventListener('keydown', handlePreviewKeydown);
       status.textContent = 'Loading preview...';
       status.classList.remove('hidden');
       renderOpenedPreviewGallery();
@@ -679,12 +704,6 @@
       if (!openedPreviewFile) return clearOpenedFilePreview();
       await downloadFile(openedPreviewFile.file_id, openedPreviewFile.name);
     };
-    window.addEventListener('keydown', (event) => {
-      if (document.getElementById('file-preview').classList.contains('hidden')) return;
-      if (event.key === 'ArrowLeft') viewPreviewAtIndex(openedPreviewIndex - 1);
-      if (event.key === 'ArrowRight') viewPreviewAtIndex(openedPreviewIndex + 1);
-      if (event.key === 'Escape') clearOpenedFilePreview();
-    });
     window.addEventListener('beforeunload', () => {
       clearPendingPreview();
       clearOpenedFilePreview();
