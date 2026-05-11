@@ -3,167 +3,576 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Everfast | Dashboard</title>
+  <title>ARK | Vault Dashboard</title>
   <script>
   (function() {
     var canvas = document.createElement('canvas');
     canvas.width = 64; canvas.height = 64;
     var ctx = canvas.getContext('2d');
-
-    var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    ctx.fillStyle = dark ? '#020617' : '#ffffff';
+    ctx.fillStyle = '#121212';
     ctx.fillRect(0, 0, 64, 64);
-
-    ctx.fillStyle = dark ? '#ffffff' : '#111827';
-    ctx.font = 'bold 34px Inter, sans-serif';
+    ctx.fillStyle = '#ff6b00';
+    ctx.font = 'bold 30px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('EF', 32, 33);
-
+    ctx.fillText('ARK', 32, 33);
     var link = document.createElement('link');
     link.rel = 'icon';
     link.href = canvas.toDataURL('image/png');
     document.head.appendChild(link);
-
-    // Update if user switches OS theme mid-session
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-      ctx.fillStyle = e.matches ? '#020617' : '#ffffff';
-      ctx.fillRect(0, 0, 64, 64);
-      ctx.fillStyle = e.matches ? '#ffffff' : '#111827';
-      ctx.fillText('EF', 32, 33);
-      link.href = canvas.toDataURL('image/png');
-    });
   })();
-</script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     :root {
-      --bg:#020617;--surface:#0f172a;--surface-accent:#1e293b;--border:rgba(255,255,255,.06);
-      --primary:#3b82f6;--text:#fff;--muted:#94a3b8;--error:#f87171;--success:#34d399;--sidebar:260px;
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface-accent: #1a1a1a;
+      --border: rgba(255,255,255,.07);
+      --border-strong: rgba(255,255,255,.12);
+      --accent: #ff6b00;
+      --accent-soft: rgba(255,107,0,.12);
+      --text: #f0f0f0;
+      --muted: #666;
+      --muted-light: #888;
+      --error: #ff4444;
+      --success: #00cc66;
+      --sidebar: 240px;
+      --font-mono: 'Space Mono', monospace;
+      --font-body: 'Inter', sans-serif;
     }
-    *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
-    body{background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
-    .mono{font-family:'JetBrains Mono',monospace}
-    .sidebar{width:var(--sidebar);background:var(--surface);padding:24px;border-right:1px solid var(--border);display:flex;flex-direction:column}
-    .logo{font-weight:900;color:#fff;text-decoration:none;display:flex;gap:8px;align-items:center;margin-bottom:34px;font-size:1.2rem;letter-spacing:-0.5px}
-    .logo span{color:var(--primary)}
-    .nav-label{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:20px 0 10px;display:block}
-    .nav-link{display:flex;gap:12px;align-items:center;padding:12px;color:var(--muted);text-decoration:none;border-radius:12px;font-weight:600;font-size:.9rem}
-    .nav-link:hover,.nav-link.active{background:var(--surface-accent);color:#fff}
-    .main{flex:1;overflow:auto;padding:36px}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:22px}
-    .badge{background:var(--surface);border:1px solid var(--border);padding:8px 14px;border-radius:100px;font-size:.84rem}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:18px}
-    .span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-12{grid-column:span 12}.span-6{grid-column:span 6}
-    .small{color:var(--muted);font-size:.82rem}
-    .btn{border:none;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem}
-    .btn-primary{background:var(--primary);color:#fff}
-    .btn-ghost{background:transparent;border:1px solid var(--border);color:#fff}
-    .btn-danger{background:var(--error);color:#fff}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .storage-ring{width:150px;height:150px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;margin:8px auto;background:radial-gradient(closest-side,var(--surface) 79%,transparent 80% 100%),conic-gradient(var(--primary) 0%,var(--surface-accent) 0)}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid var(--border);padding:11px 8px;font-size:.9rem;text-align:left}
-    th{color:var(--muted);font-size:.75rem;text-transform:uppercase}
-    .actions button{background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer}
-    .actions button:hover{color:var(--primary)}
-    input,select{background:var(--surface-accent);color:#fff;border:1px solid var(--border);padding:9px 10px;border-radius:10px;max-width:100%}
-    .pill{display:inline-block;padding:4px 8px;border-radius:8px;font-size:.7rem;font-weight:800;background:rgba(255,255,255,.08)}
-    .pill.good{background:var(--success);color:#000}
-    .hidden{display:none!important}
-    #toast{position:fixed;right:20px;bottom:20px;padding:12px 16px;background:var(--surface-accent);border:1px solid var(--border);border-radius:12px;transform:translateY(160%);transition:.2s}
-    #toast.show{transform:translateY(0)}
-    .pagination{display:flex;gap:8px;justify-content:flex-end;padding-top:12px}
-    .empty{padding:36px;text-align:center;color:var(--muted)}
-    .danger{border-color:rgba(248,113,113,.5)}
-    #files-table-wrap{overflow:auto;-webkit-overflow-scrolling:touch}
-    .mobile-nav{display:none}
-    #upload-preview{position:fixed;inset:0;background:rgba(2,6,23,.84);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
-    .preview-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:440px;width:100%}
-    .preview-image-wrap{margin:12px 0;border:1px solid var(--border);background:var(--surface-accent);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px}
-    #preview-image,#preview-video{max-width:100%;max-height:260px;display:block}
-    #preview-video{width:100%}
-    #file-preview-image,#file-preview-video{max-width:100%;max-height:360px;display:block}
-    #file-preview-video{width:100%}
-    .preview-nav{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
-    .preview-nav .btn{flex:1}
-    .preview-strip{display:flex;gap:8px;overflow:auto;padding:4px 0 2px}
-    .preview-thumb{border:1px solid var(--border);border-radius:10px;background:var(--surface-accent);color:var(--muted);cursor:pointer;padding:6px 10px;font-size:.76rem;white-space:nowrap}
-    .preview-thumb.active{border-color:var(--primary);color:#fff}
-    @media(max-width:980px){
-      .span-8,.span-4,.span-6{grid-column:span 12}
-      .sidebar{display:none}
-      .mobile-nav{display:flex;position:fixed;left:0;right:0;bottom:0;padding:10px 12px;background:rgba(15,23,42,.96);border-top:1px solid var(--border);gap:8px;z-index:15}
-      .mobile-nav button{flex:1;background:var(--surface-accent);color:var(--muted);border:1px solid var(--border);padding:10px;border-radius:10px;font-weight:700}
-      .mobile-nav button.active{color:#fff;border-color:var(--primary)}
-      body{display:block;overflow:auto}
-      .main{padding:16px 16px 88px;min-height:100vh}
-      .top{align-items:flex-start;flex-direction:column}
-      .row{align-items:stretch}
-      .btn{width:100%}
-      #toast{left:12px;right:12px;bottom:76px}
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Grid bg */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
+    }
+
+    .logo-wrap {
+      padding: 28px 24px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: var(--font-body);
+      font-weight: 900;
+      font-size: 1.6rem;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: var(--text);
+      text-decoration: none;
+      display: block;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: .55rem;
+      letter-spacing: 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .nav-section {
+      padding: 20px 16px 0;
+      flex: 1;
+    }
+
+    .nav-label {
+      font-family: var(--font-mono);
+      font-size: .58rem;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 8px;
+      margin-bottom: 6px;
+      margin-top: 18px;
+      display: block;
+    }
+
+    .nav-link {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      color: var(--muted-light);
+      text-decoration: none;
+      border-radius: 2px;
+      font-weight: 600;
+      font-size: .82rem;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      transition: all .15s;
+      border-left: 2px solid transparent;
+      background: none;
+      border-right: none;
+      border-top: none;
+      border-bottom: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .nav-link:hover { color: var(--text); background: var(--surface-accent); }
+    .nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-soft); }
+
+    .nav-link i { width: 16px; text-align: center; font-size: .85rem; }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      overflow: auto;
+      padding: 32px 36px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+
+    .page-title {
+      font-weight: 900;
+      font-size: 1.6rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      font-family: var(--font-body);
+    }
+
+    .user-badge {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      padding: 8px 16px;
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      color: var(--muted-light);
+      letter-spacing: 1px;
+    }
+
+    /* ── GRID ── */
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .span-8 { grid-column: span 8; }
+    .span-4 { grid-column: span 4; }
+    .span-12 { grid-column: span 12; }
+    .span-6 { grid-column: span 6; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--accent);
+      border-radius: 2px;
+      padding: 24px;
+      position: relative;
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── STORAGE RING ── */
+    .storage-ring {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      margin: 12px auto;
+      background:
+        radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%),
+        conic-gradient(var(--accent) 0%, var(--surface-accent) 0);
+      position: relative;
+    }
+
+    .storage-ring-pct {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--accent);
+    }
+
+    .storage-ring-label {
+      font-size: .55rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      border: none;
+      padding: 10px 16px;
+      border-radius: 2px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: .72rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: var(--font-body);
+      transition: all .15s;
+    }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #ff8533; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-danger:hover { background: #cc0000; }
+
+    .btn:disabled { opacity: .4; pointer-events: none; }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    /* ── TABLE ── */
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 11px 10px;
+      font-size: .83rem;
+      text-align: left;
+    }
+    th {
+      font-family: var(--font-mono);
+      color: var(--muted);
+      font-size: .62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    tr:hover td { background: rgba(255,107,0,.03); }
+
+    .actions button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: .95rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      transition: color .15s;
+    }
+    .actions button:hover { color: var(--accent); }
+
+    /* ── INPUTS ── */
+    input, select {
+      background: var(--surface-accent);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+      border-radius: 2px;
+      font-size: .82rem;
+      font-family: var(--font-body);
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    select option { background: var(--surface-accent); }
+
+    /* ── STATUS PILLS ── */
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 2px;
+      font-size: .65rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      background: rgba(255,255,255,.06);
+    }
+    .pill.good { background: var(--accent); color: #fff; }
+
+    /* ── MISC ── */
+    .small { color: var(--muted-light); font-size: .8rem; }
+    .mono { font-family: var(--font-mono); }
+    .hidden { display: none !important; }
+    .empty { padding: 40px; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: .75rem; letter-spacing: 2px; }
+
+    /* ── DIVIDER ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-left: 3px solid var(--accent);
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      letter-spacing: 1px;
+      transform: translateY(200%);
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+      z-index: 100;
+    }
+    #toast.show { transform: translateY(0); }
+
+    /* ── PAGINATION ── */
+    .pagination { display: flex; gap: 8px; justify-content: flex-end; padding-top: 14px; align-items: center; }
+
+    /* ── DANGER CARD ── */
+    .danger { border-top-color: var(--error); }
+
+    /* ── UPLOAD PREVIEW MODAL ── */
+    #upload-preview, #file-preview {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+
+    .preview-card {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-top: 3px solid var(--accent);
+      border-radius: 2px;
+      padding: 24px;
+      max-width: 460px;
+      width: 100%;
+    }
+
+    .preview-card-wide { max-width: 780px; }
+
+    .preview-title {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .preview-image-wrap {
+      margin: 14px 0;
+      border: 1px solid var(--border);
+      background: var(--surface-accent);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      min-height: 180px;
+    }
+
+    #preview-image, #preview-video { max-width: 100%; max-height: 260px; display: block; }
+    #preview-video { width: 100%; }
+    #file-preview-image, #file-preview-video { max-width: 100%; max-height: 360px; display: block; }
+    #file-preview-video { width: 100%; }
+
+    .preview-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+    .preview-nav .btn { flex: 1; }
+
+    .preview-strip {
+      display: flex;
+      gap: 6px;
+      overflow: auto;
+      padding: 6px 0 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) var(--surface-accent);
+    }
+
+    .preview-thumb {
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      background: var(--surface-accent);
+      color: var(--muted);
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: .68rem;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      transition: all .15s;
+    }
+    .preview-thumb:hover { border-color: var(--accent); color: var(--text); }
+    .preview-thumb.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+    #files-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ── OVERVIEW FILE ACCENT ── */
+    .file-icon-accent { color: var(--accent); margin-right: 10px; }
+
+    /* ── MOBILE ── */
+    .mobile-nav { display: none; }
+
+    @media (max-width: 980px) {
+      .span-8, .span-4, .span-6 { grid-column: span 12; }
+      .sidebar { display: none; }
+      .mobile-nav {
+        display: flex;
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        padding: 10px 12px;
+        background: rgba(17,17,17,.97);
+        border-top: 1px solid var(--border);
+        gap: 8px;
+        z-index: 15;
+      }
+      .mobile-nav button {
+        flex: 1;
+        background: var(--surface-accent);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        padding: 10px;
+        border-radius: 2px;
+        font-weight: 700;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+      }
+      .mobile-nav button.active { color: var(--accent); border-color: var(--accent); }
+      body { display: block; overflow: auto; }
+      .main { padding: 16px 16px 88px; min-height: 100vh; }
+      .top { flex-direction: column; align-items: flex-start; }
+      #toast { left: 12px; right: 12px; bottom: 76px; }
     }
   </style>
 </head>
 <body>
+
+  <!-- SIDEBAR -->
   <aside class="sidebar">
-    <a class="logo" href="/"><span>EVER</span>FAST</a>
-    <span class="nav-label">General</span>
-    <a class="nav-link" data-route="overview" href="#overview"><i class="fas fa-th-large"></i> Overview</a>
-    <a class="nav-link" data-route="files" href="#files"><i class="fas fa-folder"></i> All Files</a>
-    <span class="nav-label">Account</span>
-    <a class="nav-link" data-route="settings" href="#settings"><i class="fas fa-cog"></i> Settings</a>
-    <div style="margin-top:auto">
-      <button class="nav-link" style="width:100%;text-align:left;color:var(--error);background:none;border:none;cursor:pointer" id="logout-btn"><i class="fas fa-power-off"></i> Logout</button>
+    <div class="logo-wrap">
+      <a class="logo" href="/"><span>A</span>RK</a>
+      <div class="logo-sub">Vault Control System</div>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">General</span>
+      <a class="nav-link" data-route="overview" href="#overview"><i class="fas fa-th-large"></i> Overview</a>
+      <a class="nav-link" data-route="files" href="#files"><i class="fas fa-folder"></i> All Files</a>
+      <span class="nav-label">System</span>
+      <a class="nav-link" data-route="settings" href="#settings"><i class="fas fa-sliders-h"></i> Settings</a>
+    </div>
+    <div class="sidebar-footer">
+      <button class="nav-link" style="color: var(--error);" id="logout-btn">
+        <i class="fas fa-power-off"></i> Logout
+      </button>
     </div>
   </aside>
 
+  <!-- MAIN -->
   <main class="main">
     <div class="top">
-      <h1 id="page-title">Overview</h1>
-      <div class="badge"><span class="mono" id="user-display">Loading...</span></div>
+      <h1 class="page-title" id="page-title">Overview</h1>
+      <div class="user-badge"><span id="user-display">Loading...</span></div>
     </div>
 
+    <!-- OVERVIEW -->
     <section id="view-overview" class="view">
       <div class="grid">
         <div class="card span-8">
-          <div class="row" style="justify-content:space-between;margin-bottom:8px">
-            <strong class="mono">Vault Contents</strong>
-            <button class="btn btn-primary" id="upload-btn"><i class="fas fa-upload"></i> Upload</button>
+          <div class="row" style="justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin:0">Vault Contents</div>
+            <button class="btn btn-primary" id="upload-btn"><i class="fas fa-upload"></i>&nbsp; Upload Payload</button>
           </div>
-          <p class="small" style="margin-bottom:12px">⚠️ Files are currently limited to <strong>20 MB</strong> each. Larger file support is coming soon.</p>
+          <p class="small" style="margin-bottom:14px">
+            ⚠ Files currently limited to <strong>20 MB</strong>. Expanded capacity coming.
+          </p>
           <div id="overview-files"></div>
         </div>
         <div class="card span-4">
-          <div class="storage-ring" id="overview-ring"><span class="mono" id="overview-percent">0%</span></div>
-          <p class="small mono" id="overview-storage">0GB / 0GB</p>
-          <hr style="margin:14px 0;border-color:var(--border)">
-          <p class="small">Storage cap: <span class="mono" id="overview-cap">0GB</span></p>
+          <div class="card-title">Storage Capacity</div>
+          <div class="storage-ring" id="overview-ring">
+            <span class="storage-ring-pct" id="overview-percent">0%</span>
+            <span class="storage-ring-label">Used</span>
+          </div>
+          <p class="mono small" style="text-align:center;margin-top:4px" id="overview-storage">0GB / 0GB</p>
+          <hr class="divider">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="small">Vault Cap</span>
+            <span class="mono small" id="overview-cap">0GB</span>
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- FILES -->
     <section id="view-files" class="view hidden">
       <div class="card">
-        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <div class="row" style="justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
           <div class="row">
-            <input id="file-search" placeholder="Search files...">
+            <input id="file-search" placeholder="Search payload...">
             <select id="file-type">
-              <option value="all">All types</option><option value="image">Images</option><option value="video">Videos</option>
-              <option value="audio">Audio</option><option value="pdf">PDF</option><option value="archive">Archives</option><option value="other">Other</option>
+              <option value="all">All types</option>
+              <option value="image">Images</option>
+              <option value="video">Videos</option>
+              <option value="audio">Audio</option>
+              <option value="pdf">PDF</option>
+              <option value="archive">Archives</option>
+              <option value="other">Other</option>
             </select>
             <select id="file-sort">
-              <option value="uploaded_desc">Newest</option><option value="uploaded_asc">Oldest</option>
-              <option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option>
-              <option value="size_desc">Largest</option><option value="size_asc">Smallest</option>
+              <option value="uploaded_desc">Newest</option>
+              <option value="uploaded_asc">Oldest</option>
+              <option value="name_asc">Name A–Z</option>
+              <option value="name_desc">Name Z–A</option>
+              <option value="size_desc">Largest</option>
+              <option value="size_asc">Smallest</option>
             </select>
           </div>
           <div class="row">
-            <button class="btn btn-ghost" id="bulk-download">Bulk download</button>
-            <button class="btn btn-danger" id="bulk-delete">Bulk delete</button>
+            <button class="btn btn-ghost" id="bulk-download"><i class="fas fa-cloud-download-alt"></i>&nbsp; Bulk Download</button>
+            <button class="btn btn-danger" id="bulk-delete"><i class="fas fa-trash-alt"></i>&nbsp; Bulk Delete</button>
           </div>
         </div>
         <div id="files-table-wrap"></div>
@@ -171,48 +580,52 @@
       </div>
     </section>
 
+    <!-- SETTINGS -->
     <section id="view-settings" class="view hidden">
       <div class="grid">
         <div class="card span-6">
-          <p class="small">Profile</p>
-          <p style="margin:10px 0">Email: <span class="mono" id="settings-email">-</span></p>
-          <p>API base: <span class="mono" id="settings-api"></span></p>
-          <p style="margin-top:8px">Connection: <span id="api-status" class="pill">Unknown</span></p>
+          <div class="card-title">Profile</div>
+          <p style="margin:12px 0">Email: <span class="mono" id="settings-email">—</span></p>
+          <p>API Base: <span class="mono" id="settings-api" style="font-size:.75rem"></span></p>
+          <p style="margin-top:10px">Connection: <span id="api-status" class="pill">Unknown</span></p>
         </div>
         <div class="card span-6 danger">
-          <p class="small" style="color:var(--error)">Danger zone</p>
-          <p style="margin:8px 0 14px">Sign out of all sessions on this device.</p>
-          <button class="btn btn-danger" id="logout-all">Logout all</button>
+          <div class="card-title" style="color:var(--error)">Danger Zone</div>
+          <p class="small" style="margin: 10px 0 16px">Sign out of all sessions on this device.</p>
+          <button class="btn btn-danger" id="logout-all">Logout All</button>
         </div>
       </div>
     </section>
   </main>
 
+  <!-- MOBILE NAV -->
   <nav class="mobile-nav" aria-label="Mobile navigation">
     <button type="button" data-route="overview"><i class="fas fa-th-large"></i> Overview</button>
     <button type="button" data-route="files"><i class="fas fa-folder"></i> Files</button>
-    <button type="button" data-route="settings"><i class="fas fa-cog"></i> Settings</button>
+    <button type="button" data-route="settings"><i class="fas fa-sliders-h"></i> Settings</button>
   </nav>
 
+  <!-- UPLOAD PREVIEW MODAL -->
   <div id="upload-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
     <div class="preview-card">
-      <p id="preview-title" class="mono">Media preview</p>
-      <p class="small" id="preview-meta" style="margin-top:8px">-</p>
+      <p class="preview-title" id="preview-title">Media Preview</p>
+      <p class="small" id="preview-meta" style="margin-top:8px">—</p>
       <div class="preview-image-wrap">
         <img id="preview-image" alt="Selected upload preview">
         <video id="preview-video" class="hidden" controls preload="metadata"></video>
       </div>
-      <div class="row" style="justify-content:flex-end">
+      <div class="row" style="justify-content:flex-end;margin-top:10px">
         <button class="btn btn-ghost" id="preview-cancel" type="button">Cancel</button>
-        <button class="btn btn-primary" id="preview-upload" type="button">Upload</button>
+        <button class="btn btn-primary" id="preview-upload" type="button">Confirm Upload</button>
       </div>
     </div>
   </div>
 
+  <!-- FILE PREVIEW / GALLERY MODAL -->
   <div id="file-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
-    <div class="preview-card" style="max-width:760px">
-      <p id="file-preview-title" class="mono">Gallery</p>
-      <p class="small" id="file-preview-meta" style="margin-top:8px">-</p>
+    <div class="preview-card preview-card-wide">
+      <p class="preview-title" id="file-preview-title">Gallery</p>
+      <p class="small" id="file-preview-meta" style="margin-top:8px">—</p>
       <p class="small" id="file-preview-status" style="margin-top:8px">Loading preview...</p>
       <div class="preview-image-wrap">
         <img id="file-preview-image" alt="Previewed file">
@@ -223,7 +636,7 @@
         <button class="btn btn-ghost" id="file-preview-next" type="button">Next <i class="fas fa-chevron-right"></i></button>
       </div>
       <div class="preview-strip" id="file-preview-strip" aria-label="Gallery files"></div>
-      <div class="row" style="justify-content:flex-end">
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
         <button class="btn btn-ghost" id="file-preview-close" type="button">Close</button>
         <button class="btn btn-primary" id="file-preview-download" type="button">Download</button>
       </div>
@@ -264,12 +677,12 @@
       if (t === 'audio') return 'fa-file-audio';
       return 'fa-file-alt';
     };
-    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
+    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[ch]));
 
     function toast(msg, isErr = false) {
       const t = document.getElementById('toast');
       document.getElementById('toast-msg').textContent = msg;
-      t.style.borderColor = isErr ? 'rgba(248,113,113,.5)' : 'var(--border)';
+      t.style.borderLeftColor = isErr ? 'var(--error)' : 'var(--accent)';
       t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 2800);
     }
@@ -278,10 +691,7 @@
       try {
         const res = await fetch(`${WORKER_URL}${path}`, {
           ...opts,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...(opts.headers || {}),
-          },
+          headers: { Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
         });
         const data = await res.json().catch(() => ({ ok: false, error: 'Invalid server response' }));
         if (!res.ok || !data.ok) {
@@ -299,10 +709,10 @@
     function setRoute(route) {
       const valid = ['overview', 'files', 'settings'];
       state.route = valid.includes(route) ? route : 'overview';
-      document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
+      document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
       document.getElementById(`view-${state.route}`).classList.remove('hidden');
-      document.querySelectorAll('.nav-link[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === state.route));
-      document.querySelectorAll('.mobile-nav button[data-route]').forEach((btn) => btn.classList.toggle('active', btn.dataset.route === state.route));
+      document.querySelectorAll('.nav-link[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === state.route));
+      document.querySelectorAll('.mobile-nav button[data-route]').forEach(btn => btn.classList.toggle('active', btn.dataset.route === state.route));
       document.getElementById('page-title').textContent = state.route[0].toUpperCase() + state.route.slice(1);
       render();
     }
@@ -313,8 +723,8 @@
       const pct = safePercent(used, cap);
       const unlimited = isUnlimitedStorage(cap);
       document.getElementById('overview-percent').textContent = unlimited ? '∞' : `${pct}%`;
-      document.getElementById('overview-storage').textContent = `${formatStorageAmount(used)} / ${isUnlimitedStorage(cap) ? 'Unlimited' : formatStorageAmount(cap)}`;
-      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${unlimited ? 100 : pct}%, var(--surface-accent) 0%)`;
+      document.getElementById('overview-storage').textContent = `${formatStorageAmount(used)} / ${unlimited ? 'Unlimited' : formatStorageAmount(cap)}`;
+      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--accent) ${unlimited ? 100 : pct}%, var(--surface-accent) 0%)`;
       document.getElementById('overview-cap').textContent = unlimited ? 'Unlimited' : formatStorageAmount(cap);
     }
 
@@ -322,20 +732,20 @@
       const recent = [...state.files].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0)).slice(0, 8);
       const wrap = document.getElementById('overview-files');
       if (!recent.length) {
-        wrap.innerHTML = '<div class="empty">No files uploaded yet.</div>';
+        wrap.innerHTML = '<div class="empty">// No payloads archived yet.</div>';
         return;
       }
-      wrap.innerHTML = `<table><thead><tr><th>Name</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map((f) => `
+      wrap.innerHTML = `<table><thead><tr><th>Filename</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map(f => `
         <tr>
-          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
+          <td><i class="far ${iconFor(f.name)} file-icon-accent"></i>${esc(f.name)}</td>
           <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
           <td class="actions">
-            ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Open gallery"><i class="fas fa-images"></i></button>` : ''}
+            ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Preview"><i class="fas fa-images"></i></button>` : ''}
             <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
           </td>
         </tr>`).join('')}</tbody></table>`;
-      wrap.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => viewFileById(b.dataset.view));
-      wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+      wrap.querySelectorAll('[data-view]').forEach(b => b.onclick = () => viewFileById(b.dataset.view));
+      wrap.querySelectorAll('[data-download]').forEach(b => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
     }
 
     function renderFilesTable() {
@@ -345,55 +755,46 @@
 
       const wrap = document.getElementById('files-table-wrap');
       if (!pageData.items.length) {
-        wrap.innerHTML = '<div class="empty">No files match your filters.</div>';
+        wrap.innerHTML = '<div class="empty">// No files match your filters.</div>';
       } else {
-        wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${pageData.items.map((f) => `
+        wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Filename</th><th>Type</th><th>Size</th><th>Archived</th><th>Actions</th></tr></thead><tbody>${pageData.items.map(f => `
           <tr>
             <td><input type="checkbox" data-select="${f.id}" ${state.selected.has(String(f.id)) ? 'checked' : ''}></td>
-            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
-            <td>${esc(getFileType(f.name))}</td>
+            <td><i class="far ${iconFor(f.name)} file-icon-accent"></i>${esc(f.name)}</td>
+            <td class="mono" style="font-size:.7rem;letter-spacing:1px;color:var(--muted-light)">${esc(getFileType(f.name))}</td>
             <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
-            <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
+            <td class="small">${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '—'}</td>
             <td class="actions">
-              ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Open gallery"><i class="fas fa-images"></i></button>` : ''}
+              ${isPreviewableFile(f) ? `<button data-view="${esc(f.id)}" title="Preview"><i class="fas fa-images"></i></button>` : ''}
               <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}" title="Download"><i class="fas fa-cloud-download-alt"></i></button>
               <button data-delete="${esc(f.id)}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
             </td>
           </tr>`).join('')}</tbody></table>`;
 
         const all = wrap.querySelector('#select-all');
-        all.checked = pageData.items.every((f) => state.selected.has(String(f.id))) && pageData.items.length > 0;
+        all.checked = pageData.items.every(f => state.selected.has(String(f.id))) && pageData.items.length > 0;
         all.onchange = () => {
-          pageData.items.forEach((f) => {
-            if (all.checked) state.selected.add(String(f.id));
-            else state.selected.delete(String(f.id));
-          });
+          pageData.items.forEach(f => { if (all.checked) state.selected.add(String(f.id)); else state.selected.delete(String(f.id)); });
           renderFilesTable();
         };
-
-        wrap.querySelectorAll('[data-select]').forEach((el) => {
-          el.onchange = () => {
-            const id = String(el.dataset.select);
-            if (el.checked) state.selected.add(id); else state.selected.delete(id);
-          };
+        wrap.querySelectorAll('[data-select]').forEach(el => {
+          el.onchange = () => { const id = String(el.dataset.select); if (el.checked) state.selected.add(id); else state.selected.delete(id); };
         });
-        wrap.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => viewFileById(b.dataset.view));
-        wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
-        wrap.querySelectorAll('[data-delete]').forEach((b) => b.onclick = () => deleteFile(b.dataset.delete));
+        wrap.querySelectorAll('[data-view]').forEach(b => b.onclick = () => viewFileById(b.dataset.view));
+        wrap.querySelectorAll('[data-download]').forEach(b => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
+        wrap.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteFile(b.dataset.delete));
       }
 
       const pg = document.getElementById('files-pagination');
       pg.innerHTML = `<button class="btn btn-ghost" ${pageData.page <= 1 ? 'disabled' : ''} id="pg-prev">Prev</button>
-                      <span class="small" style="padding:8px">Page ${pageData.page} / ${pageData.pages}</span>
+                      <span class="mono small" style="padding:8px">Page ${pageData.page} / ${pageData.pages}</span>
                       <button class="btn btn-ghost" ${pageData.page >= pageData.pages ? 'disabled' : ''} id="pg-next">Next</button>`;
-      const p = document.getElementById('pg-prev');
-      const n = document.getElementById('pg-next');
-      if (p) p.onclick = () => { state.filePage -= 1; renderFilesTable(); };
-      if (n) n.onclick = () => { state.filePage += 1; renderFilesTable(); };
+      document.getElementById('pg-prev')?.addEventListener('click', () => { state.filePage -= 1; renderFilesTable(); });
+      document.getElementById('pg-next')?.addEventListener('click', () => { state.filePage += 1; renderFilesTable(); });
     }
 
     function renderSettings() {
-      document.getElementById('settings-email').textContent = state.user?.email || '-';
+      document.getElementById('settings-email').textContent = state.user?.email || '—';
       document.getElementById('settings-api').textContent = WORKER_URL;
       const status = document.getElementById('api-status');
       status.className = 'pill good';
@@ -402,7 +803,7 @@
 
     function render() {
       if (!state.user) return;
-      document.getElementById('user-display').textContent = state.user.email || '-';
+      document.getElementById('user-display').textContent = state.user.email || '—';
       updateStorageUI();
       renderOverviewFiles();
       renderFilesTable();
@@ -411,10 +812,7 @@
 
     async function refreshAll() {
       try {
-        const [user, files] = await Promise.all([
-          api('/auth/me'),
-          api('/files'),
-        ]);
+        const [user, files] = await Promise.all([api('/auth/me'), api('/files')]);
         state.user = user;
         state.files = files.files || [];
         render();
@@ -426,17 +824,12 @@
 
     function clearPendingPreview() {
       if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
-      pendingPreviewUrl = '';
-      pendingUploadFile = null;
-      document.getElementById('preview-title').textContent = 'Media preview';
+      pendingPreviewUrl = ''; pendingUploadFile = null;
+      document.getElementById('preview-title').textContent = 'Media Preview';
       const img = document.getElementById('preview-image');
       const video = document.getElementById('preview-video');
-      img.removeAttribute('src');
-      img.classList.add('hidden');
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-      video.classList.add('hidden');
+      img.removeAttribute('src'); img.classList.add('hidden');
+      video.pause(); video.removeAttribute('src'); video.load(); video.classList.add('hidden');
       document.getElementById('upload-preview').classList.add('hidden');
     }
 
@@ -445,12 +838,8 @@
       const video = document.getElementById('file-preview-video');
       if (openedPreviewUrl) URL.revokeObjectURL(openedPreviewUrl);
       openedPreviewUrl = '';
-      img.removeAttribute('src');
-      img.classList.add('hidden');
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-      video.classList.add('hidden');
+      img.removeAttribute('src'); img.classList.add('hidden');
+      video.pause(); video.removeAttribute('src'); video.load(); video.classList.add('hidden');
     }
 
     function previewKindForBlobType(type = '') {
@@ -471,15 +860,9 @@
       const url = URL.createObjectURL(blobLike);
       try {
         const parsed = new URL(url);
-        if (parsed.protocol !== 'blob:' || parsed.origin !== window.location.origin) {
-          URL.revokeObjectURL(url);
-          return '';
-        }
+        if (parsed.protocol !== 'blob:' || parsed.origin !== window.location.origin) { URL.revokeObjectURL(url); return ''; }
         return url;
-      } catch {
-        URL.revokeObjectURL(url);
-        return '';
-      }
+      } catch { URL.revokeObjectURL(url); return ''; }
     }
 
     function openUploadPreview(file) {
@@ -489,42 +872,29 @@
       pendingUploadFile = file;
       pendingPreviewUrl = createSafeObjectUrl(file);
       const kind = previewKindForFile(file);
-      const safeName = String(file.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
-      const safePreviewUrl = pendingPreviewUrl;
-      if (!safePreviewUrl || !kind) {
-        clearPendingPreview();
-        toast('Unable to preview this file.', true);
-        return;
-      }
-      document.getElementById('preview-title').textContent = kind === 'video' ? 'Video preview' : 'Image preview';
+      const safeName = String(file.name || '').replace(/[\u0000-\u001f\u007f<>"'`]/g, '').trim() || 'media';
+      if (!pendingPreviewUrl || !kind) { clearPendingPreview(); toast('Unable to preview this file.', true); return; }
+      document.getElementById('preview-title').textContent = kind === 'video' ? 'Video Preview' : 'Image Preview';
       if (kind === 'image') {
-        img.alt = `Preview of ${safeName}`;
-        img.src = safePreviewUrl;
-        img.classList.remove('hidden');
-        video.classList.add('hidden');
+        img.alt = `Preview of ${safeName}`; img.src = pendingPreviewUrl;
+        img.classList.remove('hidden'); video.classList.add('hidden');
       } else {
-        video.src = safePreviewUrl;
-        video.classList.remove('hidden');
-        img.classList.add('hidden');
+        video.src = pendingPreviewUrl; video.classList.remove('hidden'); img.classList.add('hidden');
       }
       document.getElementById('upload-preview').classList.remove('hidden');
     }
 
     function clearOpenedFilePreview() {
-      const status = document.getElementById('file-preview-status');
       clearOpenedPreviewMedia();
-      openedPreviewFile = null;
-      openedPreviewIndex = -1;
-      status.textContent = 'Loading preview...';
-      status.classList.remove('hidden');
+      openedPreviewFile = null; openedPreviewIndex = -1;
+      document.getElementById('file-preview-status').textContent = 'Loading preview...';
+      document.getElementById('file-preview-status').classList.remove('hidden');
       document.getElementById('file-preview-strip').innerHTML = '';
       document.getElementById('file-preview').classList.add('hidden');
       window.removeEventListener('keydown', handlePreviewKeydown);
     }
 
-    function getPreviewableFiles() {
-      return state.files.filter((file) => isPreviewableFile(file));
-    }
+    function getPreviewableFiles() { return state.files.filter(f => isPreviewableFile(f)); }
 
     function renderOpenedPreviewGallery() {
       const files = getPreviewableFiles();
@@ -532,12 +902,7 @@
       const nextBtn = document.getElementById('file-preview-next');
       const strip = document.getElementById('file-preview-strip');
       const current = openedPreviewIndex;
-      if (!files.length || current < 0) {
-        prevBtn.disabled = true;
-        nextBtn.disabled = true;
-        strip.innerHTML = '';
-        return;
-      }
+      if (!files.length || current < 0) { prevBtn.disabled = true; nextBtn.disabled = true; strip.innerHTML = ''; return; }
       prevBtn.disabled = current <= 0;
       nextBtn.disabled = current >= files.length - 1;
       const start = Math.max(0, current - PREVIEW_STRIP_CONTEXT);
@@ -549,9 +914,8 @@
         button.type = 'button';
         button.className = `preview-thumb${globalIdx === current ? ' active' : ''}`;
         button.dataset.previewIndex = String(globalIdx);
-        const label = String(f.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
-        button.title = label;
-        button.textContent = label;
+        const label = String(f.name || '').replace(/[\u0000-\u001f\u007f<>"'`]/g, '').trim() || 'media';
+        button.title = label; button.textContent = label;
         button.onclick = () => viewPreviewAtIndex(globalIdx);
         strip.appendChild(button);
       });
@@ -568,18 +932,9 @@
 
     function handlePreviewKeydown(event) {
       if (document.getElementById('file-preview').classList.contains('hidden')) return;
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        viewPreviewAtIndex(openedPreviewIndex - 1);
-      }
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        viewPreviewAtIndex(openedPreviewIndex + 1);
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        clearOpenedFilePreview();
-      }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); viewPreviewAtIndex(openedPreviewIndex - 1); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); viewPreviewAtIndex(openedPreviewIndex + 1); }
+      if (event.key === 'Escape') { event.preventDefault(); clearOpenedFilePreview(); }
     }
 
     async function openFilePreview(file) {
@@ -588,58 +943,43 @@
       const status = document.getElementById('file-preview-status');
       const img = document.getElementById('file-preview-image');
       const video = document.getElementById('file-preview-video');
-      const safeName = String(file?.name || '').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'media';
+      const safeName = String(file?.name || '').replace(/[\u0000-\u001f\u007f<>"'`]/g, '').trim() || 'media';
       const galleryFiles = getPreviewableFiles();
-      openedPreviewIndex = galleryFiles.findIndex((f) => String(f.id) === String(file.id));
+      openedPreviewIndex = galleryFiles.findIndex(f => String(f.id) === String(file.id));
       if (openedPreviewIndex < 0) openedPreviewIndex = 0;
-      document.getElementById('file-preview-title').textContent = galleryFiles.length > 1
-        ? `Gallery ${openedPreviewIndex + 1}/${galleryFiles.length}`
-        : safeName;
+      document.getElementById('file-preview-title').textContent = galleryFiles.length > 1 ? `Gallery ${openedPreviewIndex + 1}/${galleryFiles.length}` : safeName;
       document.getElementById('file-preview-meta').textContent = `${safeName} · ${formatStorageAmount(Number(file?.size || 0))}`;
       clearOpenedPreviewMedia();
       openedPreviewFile = file;
       preview.classList.remove('hidden');
       window.removeEventListener('keydown', handlePreviewKeydown);
       window.addEventListener('keydown', handlePreviewKeydown);
-      status.textContent = 'Loading preview...';
-      status.classList.remove('hidden');
+      status.textContent = 'Loading preview...'; status.classList.remove('hidden');
       renderOpenedPreviewGallery();
       try {
-        const res = await fetch(`${WORKER_URL}/files/view?fileId=${encodeURIComponent(file.file_id)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({ error: 'Preview failed' }));
-          throw new Error(data.error || `Preview failed (${res.status})`);
-        }
+        const res = await fetch(`${WORKER_URL}/files/view?fileId=${encodeURIComponent(file.file_id)}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) { const data = await res.json().catch(() => ({ error: 'Preview failed' })); throw new Error(data.error || `Preview failed (${res.status})`); }
         const blob = await res.blob();
         const kind = previewKindForBlobType(blob.type) || previewKindForFile(file);
-        if (!kind) {
-          throw new Error('Unsupported preview response.');
-        }
+        if (!kind) throw new Error('Unsupported preview response.');
         openedPreviewUrl = createSafeObjectUrl(blob);
         if (!openedPreviewUrl) throw new Error('Preview failed');
         if (kind === 'image') {
-          img.alt = `Preview of ${safeName}`;
-          img.src = openedPreviewUrl;
-          img.classList.remove('hidden');
-          video.classList.add('hidden');
+          img.alt = `Preview of ${safeName}`; img.src = openedPreviewUrl;
+          img.classList.remove('hidden'); video.classList.add('hidden');
         } else {
-          video.src = openedPreviewUrl;
-          video.classList.remove('hidden');
-          img.classList.add('hidden');
+          video.src = openedPreviewUrl; video.classList.remove('hidden'); img.classList.add('hidden');
         }
         status.classList.add('hidden');
       } catch (e) {
         const errMsg = e.message || 'Preview failed';
-        status.textContent = errMsg;
-        status.classList.remove('hidden');
+        status.textContent = errMsg; status.classList.remove('hidden');
         toast(errMsg, true);
       }
     }
 
     function viewFileById(id) {
-      const file = state.files.find((f) => String(f.id) === String(id));
+      const file = state.files.find(f => String(f.id) === String(id));
       if (!file) return toast('File not found', true);
       openFilePreview(file);
     }
@@ -656,120 +996,80 @@
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return;
-        if (file.size > 20 * 1024 * 1024) return toast('Files must be under 20MB.', true);
+        if (file.size > 20 * 1024 * 1024) return toast('Payload must be under 20MB.', true);
         try {
-          const previewKind = previewKindForFile(file);
-          if (previewKind === 'image' || previewKind === 'video') {
-            openUploadPreview(file);
-            return;
-          }
+          const kind = previewKindForFile(file);
+          if (kind === 'image' || kind === 'video') { openUploadPreview(file); return; }
           await submitUpload(file);
-          toast('Upload complete');
+          toast('Payload archived');
           await refreshAll();
-        } catch (e) {
-          toast(e.message || 'Upload failed', true);
-        }
+        } catch (e) { toast(e.message || 'Upload failed', true); }
       };
       input.click();
     }
 
     async function downloadFile(fileId, name) {
       try {
-        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({ error: 'Download failed' }));
-          throw new Error(data.error || `Download failed (${res.status})`);
-        }
+        const res = await fetch(`${WORKER_URL}/files/download?fileId=${encodeURIComponent(fileId)}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) { const data = await res.json().catch(() => ({ error: 'Download failed' })); throw new Error(data.error || `Download failed (${res.status})`); }
         const blob = await res.blob();
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        a.href = downloadUrl; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(downloadUrl);
-      } catch (e) {
-        toast(e.message || 'Download failed', true);
-      }
+      } catch (e) { toast(e.message || 'Download failed', true); }
     }
 
     async function deleteFile(id) {
-      if (!confirm('Delete file permanently?')) return;
+      if (!confirm('Permanently delete this file?')) return;
       try {
-        await api('/files/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileRecordId: id }),
-        });
+        await api('/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileRecordId: id }) });
         state.selected.delete(String(id));
         toast('File deleted');
         await refreshAll();
-      } catch (e) {
-        toast(e.message || 'Delete failed', true);
-      }
+      } catch (e) { toast(e.message || 'Delete failed', true); }
     }
 
     async function bulkDelete() {
       const ids = [...state.selected];
       if (!ids.length) return toast('Select at least one file', true);
-      if (!confirm(`Delete ${ids.length} files?`)) return;
+      if (!confirm(`Delete ${ids.length} files permanently?`)) return;
       for (const id of ids) {
-        try {
-          await api('/files/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileRecordId: id }),
-          });
-        } catch (_) {}
+        try { await api('/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileRecordId: id }) }); } catch (_) {}
       }
       state.selected.clear();
-      toast('Bulk delete finished');
+      toast('Bulk delete complete');
       await refreshAll();
     }
 
     async function bulkDownload() {
       const ids = [...state.selected];
       if (!ids.length) return toast('Select at least one file', true);
-      const selectedFiles = state.files.filter((f) => ids.includes(String(f.id)));
-      for (const f of selectedFiles) {
+      for (const f of state.files.filter(f => ids.includes(String(f.id)))) {
         await downloadFile(f.file_id, f.name);
       }
     }
 
-    function logout() {
-      localStorage.removeItem('jwork_token');
-      window.location.href = '/auth';
-    }
+    function logout() { localStorage.removeItem('jwork_token'); window.location.href = '/auth'; }
 
+    // Event listeners
     window.addEventListener('hashchange', () => setRoute(location.hash.replace('#', '') || 'overview'));
-
     document.getElementById('upload-btn').onclick = uploadFile;
     document.getElementById('logout-btn').onclick = logout;
     document.getElementById('logout-all').onclick = logout;
-
-    document.getElementById('file-search').oninput = (e) => { state.fileFilters.query = e.target.value; state.filePage = 1; renderFilesTable(); };
-    document.getElementById('file-type').onchange = (e) => { state.fileFilters.type = e.target.value; state.filePage = 1; renderFilesTable(); };
-    document.getElementById('file-sort').onchange = (e) => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-search').oninput = e => { state.fileFilters.query = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-type').onchange = e => { state.fileFilters.type = e.target.value; state.filePage = 1; renderFilesTable(); };
+    document.getElementById('file-sort').onchange = e => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
     document.getElementById('bulk-delete').onclick = bulkDelete;
     document.getElementById('bulk-download').onclick = bulkDownload;
-    document.querySelectorAll('.mobile-nav button[data-route]').forEach((btn) => {
-      btn.onclick = () => { location.hash = btn.dataset.route; };
-    });
+    document.querySelectorAll('.mobile-nav button[data-route]').forEach(btn => { btn.onclick = () => { location.hash = btn.dataset.route; }; });
     document.getElementById('preview-cancel').onclick = clearPendingPreview;
     document.getElementById('preview-upload').onclick = async () => {
       if (!pendingUploadFile) return clearPendingPreview();
       const file = pendingUploadFile;
-      try {
-        await submitUpload(file);
-        clearPendingPreview();
-        toast('Upload complete');
-        await refreshAll();
-      } catch (e) {
-        toast(e.message || 'Upload failed', true);
-      }
+      try { await submitUpload(file); clearPendingPreview(); toast('Payload archived'); await refreshAll(); }
+      catch (e) { toast(e.message || 'Upload failed', true); }
     };
     document.getElementById('file-preview-close').onclick = clearOpenedFilePreview;
     document.getElementById('file-preview-prev').onclick = () => viewPreviewAtIndex(openedPreviewIndex - 1);
@@ -778,10 +1078,7 @@
       if (!openedPreviewFile) return clearOpenedFilePreview();
       await downloadFile(openedPreviewFile.file_id, openedPreviewFile.name);
     };
-    window.addEventListener('beforeunload', () => {
-      clearPendingPreview();
-      clearOpenedFilePreview();
-    });
+    window.addEventListener('beforeunload', () => { clearPendingPreview(); clearOpenedFilePreview(); });
 
     setRoute(location.hash.replace('#', '') || 'overview');
     refreshAll();
