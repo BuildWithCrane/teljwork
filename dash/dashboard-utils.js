@@ -10,6 +10,25 @@ export function bytesToGB(bytes) {
   return n / 1024 ** 3;
 }
 
+export function isUnlimitedStorage(bytes) {
+  return Number.isFinite(bytes) && Number(bytes) < 0;
+}
+
+export function formatStorageAmount(bytes) {
+  if (isUnlimitedStorage(bytes)) return 'Unlimited';
+  const n = Number.isFinite(bytes) ? Math.max(0, Number(bytes)) : 0;
+  const units = [
+    { label: 'TB', size: 1024 ** 4 },
+    { label: 'GB', size: 1024 ** 3 },
+    { label: 'MB', size: 1024 ** 2 },
+    { label: 'KB', size: 1024 },
+  ];
+  for (const unit of units) {
+    if (n >= unit.size) return `${(n / unit.size).toFixed(2)} ${unit.label}`;
+  }
+  return `${n.toFixed(0)} B`;
+}
+
 export function getFileType(name = '') {
   const ext = String(name).toLowerCase().split('.').pop();
   if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return 'image';

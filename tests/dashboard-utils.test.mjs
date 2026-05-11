@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { safePercent, getFileType, filterAndSortFiles, paginate } from '../dash/dashboard-utils.js';
+import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage } from '../dash/dashboard-utils.js';
 
 test('safePercent handles invalid and bounded values', () => {
   assert.equal(safePercent(0, 0), 0);
@@ -37,4 +37,13 @@ test('paginate returns stable page metadata', () => {
   assert.equal(p.page, 3);
   assert.equal(p.pages, 3);
   assert.deepEqual(p.items, [21, 22, 23, 24, 25]);
+});
+
+test('formatStorageAmount formats binary units and unlimited', () => {
+  assert.equal(formatStorageAmount(1024 ** 4), '1.00 TB');
+  assert.equal(formatStorageAmount(1024 ** 3), '1.00 GB');
+  assert.equal(formatStorageAmount(1024 ** 2), '1.00 MB');
+  assert.equal(formatStorageAmount(1024), '1.00 KB');
+  assert.equal(formatStorageAmount(-1), 'Unlimited');
+  assert.equal(isUnlimitedStorage(-1), true);
 });

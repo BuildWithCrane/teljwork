@@ -70,7 +70,7 @@
     th{color:var(--muted);font-size:.75rem;text-transform:uppercase}
     .actions button{background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer}
     .actions button:hover{color:var(--primary)}
-    input,select{background:var(--surface-accent);color:#fff;border:1px solid var(--border);padding:9px 10px;border-radius:10px}
+    input,select{background:var(--surface-accent);color:#fff;border:1px solid var(--border);padding:9px 10px;border-radius:10px;max-width:100%}
     .pill{display:inline-block;padding:4px 8px;border-radius:8px;font-size:.7rem;font-weight:800;background:rgba(255,255,255,.08)}
     .pill.good{background:var(--success);color:#000}
     .hidden{display:none!important}
@@ -79,7 +79,25 @@
     .pagination{display:flex;gap:8px;justify-content:flex-end;padding-top:12px}
     .empty{padding:36px;text-align:center;color:var(--muted)}
     .danger{border-color:rgba(248,113,113,.5)}
-    @media(max-width:980px){.span-8,.span-4,.span-6{grid-column:span 12}.sidebar{display:none}body{display:block}.main{padding:16px;height:100vh}}
+    #files-table-wrap{overflow:auto;-webkit-overflow-scrolling:touch}
+    .mobile-nav{display:none}
+    #upload-preview{position:fixed;inset:0;background:rgba(2,6,23,.84);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+    .preview-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:440px;width:100%}
+    .preview-image-wrap{margin:12px 0;border:1px solid var(--border);background:var(--surface-accent);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px}
+    #preview-image{max-width:100%;max-height:260px;display:block}
+    @media(max-width:980px){
+      .span-8,.span-4,.span-6{grid-column:span 12}
+      .sidebar{display:none}
+      .mobile-nav{display:flex;position:fixed;left:0;right:0;bottom:0;padding:10px 12px;background:rgba(15,23,42,.96);border-top:1px solid var(--border);gap:8px;z-index:15}
+      .mobile-nav button{flex:1;background:var(--surface-accent);color:var(--muted);border:1px solid var(--border);padding:10px;border-radius:10px;font-weight:700}
+      .mobile-nav button.active{color:#fff;border-color:var(--primary)}
+      body{display:block;overflow:auto}
+      .main{padding:16px 16px 88px;min-height:100vh}
+      .top{align-items:flex-start;flex-direction:column}
+      .row{align-items:stretch}
+      .btn{width:100%}
+      #toast{left:12px;right:12px;bottom:76px}
+    }
   </style>
 </head>
 <body>
@@ -162,10 +180,30 @@
     </section>
   </main>
 
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <button type="button" data-route="overview"><i class="fas fa-th-large"></i> Overview</button>
+    <button type="button" data-route="files"><i class="fas fa-folder"></i> Files</button>
+    <button type="button" data-route="settings"><i class="fas fa-cog"></i> Settings</button>
+  </nav>
+
+  <div id="upload-preview" class="hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="preview-card">
+      <p id="preview-title" class="mono">Image preview</p>
+      <p class="small" id="preview-meta" style="margin-top:8px">-</p>
+      <div class="preview-image-wrap">
+        <img id="preview-image" alt="Selected upload preview">
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn btn-ghost" id="preview-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="preview-upload" type="button">Upload</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"><span id="toast-msg"></span></div>
 
   <script type="module">
-    import { safePercent, bytesToGB, getFileType, filterAndSortFiles, paginate } from './dashboard-utils.js';
+    import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage } from './dashboard-utils.js';
 
     const token = localStorage.getItem('jwork_token');
     if (!token) window.location.href = '/auth/';
@@ -179,6 +217,8 @@
       filePage: 1,
       selected: new Set(),
     };
+    let pendingUploadFile = null;
+    let pendingPreviewUrl = '';
 
     const iconFor = (name) => {
       const t = getFileType(name);
@@ -189,6 +229,7 @@
       if (t === 'audio') return 'fa-file-audio';
       return 'fa-file-alt';
     };
+    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
 
     function toast(msg, isErr = false) {
       const t = document.getElementById('toast');
@@ -226,6 +267,7 @@
       document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
       document.getElementById(`view-${state.route}`).classList.remove('hidden');
       document.querySelectorAll('.nav-link[data-route]').forEach((a) => a.classList.toggle('active', a.dataset.route === state.route));
+      document.querySelectorAll('.mobile-nav button[data-route]').forEach((btn) => btn.classList.toggle('active', btn.dataset.route === state.route));
       document.getElementById('page-title').textContent = state.route[0].toUpperCase() + state.route.slice(1);
       render();
     }
@@ -234,10 +276,11 @@
       const used = Number(state.user?.storage_used || 0);
       const cap = Number(state.user?.storage_cap || 0);
       const pct = safePercent(used, cap);
-      document.getElementById('overview-percent').textContent = `${pct}%`;
-      document.getElementById('overview-storage').textContent = `${bytesToGB(used).toFixed(2)}GB / ${bytesToGB(cap).toFixed(2)}GB`;
-      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${pct}%, var(--surface-accent) 0%)`;
-      document.getElementById('overview-cap').textContent = `${bytesToGB(cap).toFixed(2)}GB`;
+      const unlimited = isUnlimitedStorage(cap);
+      document.getElementById('overview-percent').textContent = unlimited ? '∞' : `${pct}%`;
+      document.getElementById('overview-storage').textContent = `${formatStorageAmount(used)} / ${isUnlimitedStorage(cap) ? 'Unlimited' : formatStorageAmount(cap)}`;
+      document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--primary) ${unlimited ? 100 : pct}%, var(--surface-accent) 0%)`;
+      document.getElementById('overview-cap').textContent = unlimited ? 'Unlimited' : formatStorageAmount(cap);
     }
 
     function renderOverviewFiles() {
@@ -249,9 +292,9 @@
       }
       wrap.innerHTML = `<table><thead><tr><th>Name</th><th>Size</th><th>Action</th></tr></thead><tbody>${recent.map((f) => `
         <tr>
-          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
-          <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
-          <td class="actions"><button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
+          <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
+          <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
+          <td class="actions"><button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button></td>
         </tr>`).join('')}</tbody></table>`;
       wrap.querySelectorAll('[data-download]').forEach((b) => b.onclick = () => downloadFile(b.dataset.download, decodeURIComponent(b.dataset.name)));
     }
@@ -268,13 +311,13 @@
         wrap.innerHTML = `<table><thead><tr><th><input id="select-all" type="checkbox"></th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${pageData.items.map((f) => `
           <tr>
             <td><input type="checkbox" data-select="${f.id}" ${state.selected.has(String(f.id)) ? 'checked' : ''}></td>
-            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${f.name}</td>
-            <td>${getFileType(f.name)}</td>
-            <td class="mono">${(Number(f.size || 0) / 1024 / 1024).toFixed(2)} MB</td>
+            <td><i class="far ${iconFor(f.name)}" style="color:var(--primary);margin-right:8px"></i>${esc(f.name)}</td>
+            <td>${esc(getFileType(f.name))}</td>
+            <td class="mono">${formatStorageAmount(Number(f.size || 0))}</td>
             <td>${f.uploaded_at ? new Date(f.uploaded_at).toLocaleString() : '-'}</td>
             <td class="actions">
-              <button data-download="${f.file_id}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
-              <button data-delete="${f.id}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
+              <button data-download="${esc(f.file_id)}" data-name="${encodeURIComponent(f.name)}"><i class="fas fa-cloud-download-alt"></i></button>
+              <button data-delete="${esc(f.id)}" style="color:var(--error)"><i class="fas fa-trash-alt"></i></button>
             </td>
           </tr>`).join('')}</tbody></table>`;
 
@@ -340,6 +383,38 @@
       }
     }
 
+    function clearPendingPreview() {
+      if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+      pendingPreviewUrl = '';
+      pendingUploadFile = null;
+      const img = document.getElementById('preview-image');
+      img.removeAttribute('src');
+      document.getElementById('upload-preview').classList.add('hidden');
+    }
+
+    function openImagePreview(file) {
+      const img = document.getElementById('preview-image');
+      document.getElementById('preview-meta').textContent = `${file.name} · ${formatStorageAmount(file.size)}`;
+      pendingUploadFile = file;
+      pendingPreviewUrl = URL.createObjectURL(file);
+      const safeName = String(file.name || 'image').replace(/[\u0000-\u001f\u007f<>"'\`]/g, '').trim() || 'image';
+      img.alt = `Preview of ${safeName}`;
+      const safePreviewUrl = pendingPreviewUrl.startsWith('blob:') ? pendingPreviewUrl : '';
+      if (!safePreviewUrl) {
+        clearPendingPreview();
+        toast('Unable to preview this image.', true);
+        return;
+      }
+      img.src = safePreviewUrl;
+      document.getElementById('upload-preview').classList.remove('hidden');
+    }
+
+    async function submitUpload(file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api('/files/upload', { method: 'POST', body: fd, headers: {} });
+    }
+
     async function uploadFile() {
       const input = document.createElement('input');
       input.type = 'file';
@@ -347,10 +422,12 @@
         const file = input.files?.[0];
         if (!file) return;
         if (file.size > 20 * 1024 * 1024) return toast('Files must be under 20MB.', true);
-        const fd = new FormData();
-        fd.append('file', file);
         try {
-          await api('/files/upload', { method: 'POST', body: fd, headers: {} });
+          if (String(file.type || '').startsWith('image/')) {
+            openImagePreview(file);
+            return;
+          }
+          await submitUpload(file);
           toast('Upload complete');
           await refreshAll();
         } catch (e) {
@@ -442,6 +519,23 @@
     document.getElementById('file-sort').onchange = (e) => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
     document.getElementById('bulk-delete').onclick = bulkDelete;
     document.getElementById('bulk-download').onclick = bulkDownload;
+    document.querySelectorAll('.mobile-nav button[data-route]').forEach((btn) => {
+      btn.onclick = () => { location.hash = btn.dataset.route; };
+    });
+    document.getElementById('preview-cancel').onclick = clearPendingPreview;
+    document.getElementById('preview-upload').onclick = async () => {
+      if (!pendingUploadFile) return clearPendingPreview();
+      const file = pendingUploadFile;
+      try {
+        await submitUpload(file);
+        clearPendingPreview();
+        toast('Upload complete');
+        await refreshAll();
+      } catch (e) {
+        toast(e.message || 'Upload failed', true);
+      }
+    };
+    window.addEventListener('beforeunload', clearPendingPreview);
 
     setRoute(location.hash.replace('#', '') || 'overview');
     refreshAll();
