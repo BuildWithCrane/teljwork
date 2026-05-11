@@ -533,9 +533,10 @@
         img.src = openedPreviewUrl;
         status.classList.add('hidden');
       } catch (e) {
-        status.textContent = e.message || 'Preview failed';
+        const errMsg = e.message || 'Preview failed';
+        status.textContent = errMsg;
         status.classList.remove('hidden');
-        toast(e.message || 'Preview failed', true);
+        toast(errMsg, true);
       }
     }
 

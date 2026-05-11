@@ -612,21 +612,30 @@ function enc(s) {
   return encodeURIComponent(String(s));
 }
 
+const IMAGE_MIME_BY_EXTENSION = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+function imageExtensionFor(name = '') {
+  const lower = String(name).toLowerCase().trim();
+  const ext = lower.split('.').pop();
+  return IMAGE_MIME_BY_EXTENSION[ext] ? ext : '';
+}
+
 function isPreviewableImageFile(file = {}) {
   const mime = String(file?.type || '').toLowerCase();
   if (mime.startsWith('image/')) return true;
-  const name = String(file?.name || '').toLowerCase();
-  return /\.(jpg|jpeg|png|gif|svg|webp)$/.test(name);
+  return Boolean(imageExtensionFor(file?.name || ''));
 }
 
 function guessImageContentType(name = '') {
-  const lower = String(name).toLowerCase();
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.gif')) return 'image/gif';
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  return '';
+  const ext = imageExtensionFor(name);
+  return ext ? IMAGE_MIME_BY_EXTENSION[ext] : '';
 }
 
 function jsonOk(data) {
