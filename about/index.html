@@ -1,0 +1,139 @@
+/* --- This Is Apart Of The Rebrand --- */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About ARK | The Persistent Cloud</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent: #ff6b00;
+            --bg: #fdfdfd;
+            --text-main: #121212;
+            --text-sub: #5a5a5a;
+            --border: #ececec;
+        }
+
+        * { box-sizing: border-box; scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.8;
+        }
+
+        nav {
+            position: sticky;
+            top: 0; z-index: 1000;
+            backdrop-filter: blur(15px);
+            background: rgba(253, 253, 253, 0.85);
+            border-bottom: 1px solid var(--border);
+            padding: 18px 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo { font-weight: 900; letter-spacing: 4px; font-size: 1.4rem; text-decoration: none; color: var(--text-main); }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 100px 8%; }
+
+        /* --- EDITORIAL LAYOUT --- */
+        .hero-title { font-size: clamp(3rem, 8vw, 6rem); font-weight: 900; line-height: 1; letter-spacing: -3px; margin-bottom: 40px; }
+        
+        .lead { font-size: 1.5rem; color: var(--text-sub); margin-bottom: 60px; font-weight: 400; }
+
+        .section-label { color: var(--accent); text-transform: uppercase; letter-spacing: 4px; font-weight: 800; font-size: 0.8rem; margin-bottom: 20px; display: block; }
+
+        .manifesto-block { border-left: 8px solid var(--text-main); padding-left: 40px; margin: 80px 0; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 60px; margin: 80px 0; }
+
+        .grid-item h3 { font-weight: 900; text-transform: uppercase; font-size: 1.2rem; margin-bottom: 15px; }
+
+        .visual-break {
+            background: var(--text-main);
+            color: white;
+            padding: 80px 8%;
+            text-align: center;
+            margin: 100px 0;
+        }
+
+        .btn {
+            background: var(--text-main);
+            color: white;
+            text-decoration: none;
+            padding: 18px 40px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.8rem;
+            display: inline-block;
+            border-radius: 4px;
+        }
+
+        footer { padding: 80px 8%; text-align: center; border-top: 1px solid var(--border); background: #fafafa; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="index.html" class="logo">ARK</a>
+        <a href="index.html#plans" class="btn" style="padding: 12px 25px; font-size: 0.7rem;">Access Vault</a>
+    </nav>
+
+    <main class="container">
+        <span class="section-label">Our Mission</span>
+        <h1 class="hero-title">Engineering <br>for Permanence.</h1>
+        <p class="lead">In an era of disposable data and volatile platforms, ARK was built to be the "hull" that keeps your digital legacy afloat. We don't build for the next month. We build for the next decade.</p>
+
+        <div class="manifesto-block">
+            <h2 style="font-size: 2.5rem; font-weight: 900; line-height: 1.2;">"Most cloud storage is a lease. <br>ARK is a foundation."</h2>
+            <p style="margin-top: 20px; font-size: 1.1rem;">We realized that the modern internet is fragile. Services disappear, companies pivot, and "unlimited" storage often comes with hidden strings. ARK was founded to provide a cold-storage alternative: a place where files are tucked away into a high-persistence distributed network, out of reach from the noise of the live web.</p>
+        </div>
+
+        <span class="section-label">The Three Pillars</span>
+        <div class="grid">
+            <div class="grid-item">
+                <i class="fas fa-anchor" style="font-size: 2rem; color: var(--accent); margin-bottom: 20px;"></i>
+                <h3>Redundancy First</h3>
+                <p>We don't rely on a single server or a single point of failure. Your data is distributed across a global network of secure nodes, ensuring that even in the event of localized infrastructure failure, your archive remains intact.</p>
+            </div>
+            <div class="grid-item">
+                <i class="fas fa-eye-slash" style="font-size: 2rem; color: var(--accent); margin-bottom: 20px;"></i>
+                <h3>Privacy by Default</h3>
+                <p>We operate on a strict privacy-first protocol. Our systems are designed to bridge your data to the archive without metadata mining or content scanning. You are the sole occupant of your Ark.</p>
+            </div>
+            <div class="grid-item">
+                <i class="fas fa-snowflake" style="font-size: 2rem; color: var(--accent); margin-bottom: 20px;"></i>
+                <h3>Cold-Storage Focus</h3>
+                <p>By specializing in cold storage, we avoid the overhead of live-syncing services. This allows us to focus entirely on file integrity and long-term persistence for your most important payloads.</p>
+            </div>
+        </div>
+    </main>
+
+    <div class="visual-break">
+        <h2 style="font-size: 2.5rem; font-weight: 900; margin-bottom: 20px;">Ready to Secure Your Archive?</h2>
+        <p style="margin-bottom: 40px; opacity: 0.8; max-width: 600px; margin-left: auto; margin-right: auto;">Join the thousands of creators and engineers who trust ARK for their deep-storage needs.</p>
+        <a href="index.html#plans" class="btn" style="background: var(--accent);">Initialize Your Vault</a>
+    </div>
+
+    <main class="container" style="padding-top: 0;">
+        <span class="section-label">The Infrastructure</span>
+        <h2 style="font-size: 2.5rem; font-weight: 900; margin-bottom: 30px;">How it Works</h2>
+        <p style="font-size: 1.1rem; margin-bottom: 30px;">ARK utilizes a proprietary API that fragments and distributes payloads across <strong>Global Distribution Nodes</strong>. This industrial approach to storage means your files are not just sitting in a folder; they are integrated into a high-availability network optimized for <strong>High Persistence</strong>.</p>
+        
+        <p style="font-size: 1.1rem;">Whether you are storing raw cinema 4K footage, architectural blueprints, or a lifetime of family photos, ARK treats every byte as a critical payload. We manage the complexity of the backend so you can focus on what matters: knowing your data is safe.</p>
+    </main>
+
+    <footer>
+        <p style="font-weight: 900; letter-spacing: 4px; font-size: 1.5rem; margin-bottom: 15px;">ARK</p>
+        <p style="color: var(--text-sub); font-size: 0.85rem; margin: 0;">© 2026 ARK CLOUD SYSTEMS. BUILT FOR THE LONG HAUL.</p>
+    </footer>
+
+</body>
+</html>
