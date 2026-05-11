@@ -26,21 +26,34 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     :root {
+      --bg: #fdfdfd;
+      --surface: #ffffff;
+      --surface-accent: #f4f4f4;
+      --border: rgba(0,0,0,.08);
+      --border-strong: rgba(0,0,0,.14);
+      --accent: #ff6b00;
+      --accent-soft: rgba(255,107,0,.1);
+      --text: #121212;
+      --muted: #999;
+      --muted-light: #666;
+      --error: #dd2222;
+      --success: #00aa55;
+      --sidebar: 240px;
+      --font-mono: 'Space Mono', monospace;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    html.dark {
       --bg: #0a0a0a;
       --surface: #111111;
       --surface-accent: #1a1a1a;
       --border: rgba(255,255,255,.07);
       --border-strong: rgba(255,255,255,.12);
-      --accent: #ff6b00;
-      --accent-soft: rgba(255,107,0,.12);
       --text: #f0f0f0;
-      --muted: #666;
+      --muted: #555;
       --muted-light: #888;
       --error: #ff4444;
       --success: #00cc66;
-      --sidebar: 240px;
-      --font-mono: 'Space Mono', monospace;
-      --font-body: 'Inter', sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,10 +71,13 @@
       content: '';
       position: fixed;
       inset: 0;
-      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-image: radial-gradient(rgba(0,0,0,.07) 1px, transparent 1px);
       background-size: 40px 40px;
       pointer-events: none;
       z-index: 0;
+    }
+    html.dark body::before {
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
     }
 
     /* ── SIDEBAR ── */
@@ -462,11 +478,12 @@
         position: fixed;
         left: 0; right: 0; bottom: 0;
         padding: 10px 12px;
-        background: rgba(17,17,17,.97);
+        background: rgba(255,255,255,.97);
         border-top: 1px solid var(--border);
         gap: 8px;
         z-index: 15;
       }
+      html.dark .mobile-nav { background: rgba(17,17,17,.97); }
       .mobile-nav button {
         flex: 1;
         background: var(--surface-accent);
@@ -486,6 +503,36 @@
       .top { flex-direction: column; align-items: flex-start; }
       #toast { left: 12px; right: 12px; bottom: 76px; }
     }
+
+    /* ── DARK MODE TOGGLE ── */
+    .toggle-btn {
+      width: 48px;
+      height: 26px;
+      background: var(--surface-accent);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      cursor: pointer;
+      position: relative;
+      transition: background .2s, border-color .2s;
+      flex-shrink: 0;
+    }
+    .toggle-btn[aria-checked="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .toggle-knob {
+      display: block;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle-btn[aria-checked="true"] .toggle-knob { transform: translateX(22px); }
   </style>
 </head>
 <body>
@@ -586,8 +633,19 @@
         <div class="card span-6">
           <div class="card-title">Profile</div>
           <p style="margin:12px 0">Email: <span class="mono" id="settings-email">—</span></p>
-          <p>API Base: <span class="mono" id="settings-api" style="font-size:.75rem"></span></p>
           <p style="margin-top:10px">Connection: <span id="api-status" class="pill">Unknown</span></p>
+        </div>
+        <div class="card span-6">
+          <div class="card-title">Appearance</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <div>
+              <p style="font-weight:700;font-size:.9rem">Dark Mode</p>
+              <p class="small" style="margin-top:4px">Switch to a dark vault interface.</p>
+            </div>
+            <button id="dark-mode-toggle" class="toggle-btn" aria-label="Toggle dark mode" role="switch" aria-checked="false">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
         </div>
         <div class="card span-6 danger">
           <div class="card-title" style="color:var(--error)">Danger Zone</div>
@@ -795,10 +853,13 @@
 
     function renderSettings() {
       document.getElementById('settings-email').textContent = state.user?.email || '—';
-      document.getElementById('settings-api').textContent = WORKER_URL;
       const status = document.getElementById('api-status');
       status.className = 'pill good';
       status.textContent = 'Connected';
+      // Sync toggle state
+      const isDark = document.documentElement.classList.contains('dark');
+      const toggle = document.getElementById('dark-mode-toggle');
+      toggle.setAttribute('aria-checked', isDark ? 'true' : 'false');
     }
 
     function render() {
@@ -1079,6 +1140,21 @@
       await downloadFile(openedPreviewFile.file_id, openedPreviewFile.name);
     };
     window.addEventListener('beforeunload', () => { clearPendingPreview(); clearOpenedFilePreview(); });
+
+    // Dark mode
+    function applyDark(on) {
+      document.documentElement.classList.toggle('dark', on);
+      localStorage.setItem('ark_dark', on ? '1' : '0');
+      const toggle = document.getElementById('dark-mode-toggle');
+      if (toggle) toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+    // Restore preference
+    if (localStorage.getItem('ark_dark') === '1') applyDark(true);
+
+    document.getElementById('dark-mode-toggle').onclick = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      applyDark(!isDark);
+    };
 
     setRoute(location.hash.replace('#', '') || 'overview');
     refreshAll();
