@@ -559,9 +559,6 @@
             <div class="card-title" style="margin:0">Vault Contents</div>
             <button class="btn btn-primary" id="upload-btn"><i class="fas fa-upload"></i>&nbsp; Upload Payload</button>
           </div>
-          <p class="small" style="margin-bottom:14px">
-            ⚠ Files currently limited to <strong>20 MB</strong>. Expanded capacity coming.
-          </p>
           <div id="overview-files"></div>
         </div>
         <div class="card span-4">
@@ -697,6 +694,7 @@
     if (!token) window.location.href = '/auth/';
 
     const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+    const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
     const state = {
       user: null,
       files: [],
@@ -1044,7 +1042,7 @@
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return;
-        if (file.size > 20 * 1024 * 1024) return toast('Payload must be under 20MB.', true);
+        if (file.size > MAX_FILE_SIZE_BYTES) return toast('Payload must be under 2GB.', true);
         try {
           const kind = previewKindForFile(file);
           if (kind === 'image' || kind === 'video') { openUploadPreview(file); return; }
