@@ -45,43 +45,185 @@ function serveAdminPage() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin</title>
+  <title>ARK | Admin Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; }
-    body { margin: 0; background: #020617; color: #f8fafc; font-family: Inter, system-ui, -apple-system, sans-serif; }
-    .wrap { max-width: 980px; margin: 32px auto; padding: 0 16px; }
-    .card { background: #0f172a; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    :root {
+      color-scheme: dark;
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface-accent: #1a1a1a;
+      --border: rgba(255,255,255,.07);
+      --border-strong: rgba(255,255,255,.12);
+      --text: #f0f0f0;
+      --muted: #666;
+      --muted-light: #888;
+      --accent: #ff6b00;
+      --accent-soft: rgba(255,107,0,.12);
+      --error: #ff4444;
+      --success: #00cc66;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 18px 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .brand {
+      font-weight: 900;
+      font-size: 1.4rem;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+    }
+    .brand span { color: var(--accent); }
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: .58rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted-light);
+      margin-top: 3px;
+    }
+    .status-chip {
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      border-radius: 2px;
+      padding: 8px 14px;
+      font-family: var(--font-mono);
+      font-size: .68rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted-light);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--accent);
+      border-radius: 2px;
+      padding: 18px;
+    }
+    .card-title {
+      margin: 0 0 12px;
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      letter-spacing: 3px;
+      color: var(--muted-light);
+      text-transform: uppercase;
+    }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    input, button { border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: #1e293b; color: #fff; padding: 10px 12px; }
-    button { cursor: pointer; background: #2563eb; border-color: #2563eb; font-weight: 700; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; }
-    th { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .muted { color: #94a3b8; font-size: 13px; }
-    .error { color: #f87171; }
-    .ok { color: #34d399; }
+    input, button {
+      border-radius: 2px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-accent);
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: var(--font-body);
+      font-size: .84rem;
+    }
+    input:focus, button:focus { outline: 1px solid var(--accent); outline-offset: 1px; }
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #111;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      font-size: .75rem;
+    }
+    button:hover { filter: brightness(1.03); }
+    button:disabled { opacity: .65; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td {
+      text-align: left;
+      padding: 11px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted-light);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: var(--font-mono);
+    }
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--muted-light); font-size: 13px; }
+    .error { color: var(--error); }
+    .ok { color: var(--success); }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.12);
+    }
+    .hint {
+      margin: 10px 0 0;
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="brand"><span>A</span>RK</div>
+        <div class="brand-sub">Admin Control Node</div>
+      </div>
+      <div class="status-chip">Restricted Access</div>
+    </div>
+
+    <div class="grid">
     <div class="card">
-      <h1 style="margin:0 0 12px;font-size:20px">Admin Console</h1>
+      <h1 class="card-title">Admin Authentication</h1>
       <div class="row">
         <input id="password" type="password" placeholder="Admin password" style="min-width:260px" />
-        <button id="load">Load users</button>
+        <button id="load">Load Users</button>
       </div>
-      <p class="muted" style="margin:10px 0 0">This page is intentionally hidden. Access requires the worker env var <span class="mono">ADMIN_PASSWORD</span>.</p>
-      <p class="muted" style="margin:8px 0 0">Use only over HTTPS.</p>
-      <p id="status" class="muted" style="min-height:18px;margin:10px 0 0"></p>
+      <p class="muted hint">This endpoint is intentionally hidden. Access requires the worker env var <span class="mono">ADMIN_PASSWORD</span>.</p>
+      <p class="muted hint">Use only over HTTPS.</p>
+      <p id="status" class="muted hint" style="min-height:18px"></p>
     </div>
 
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <strong>Users</strong>
+        <h2 class="card-title" style="margin:0">User Capacity Controls</h2>
         <span id="count" class="muted">0 users</span>
       </div>
-      <div style="overflow:auto;margin-top:10px">
+      <div class="table-wrap" style="margin-top:10px">
         <table>
           <thead>
             <tr>
@@ -96,6 +238,7 @@ function serveAdminPage() {
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   </div>
 
