@@ -722,12 +722,18 @@
     };
     const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[ch]));
 
-    function toast(msg, isErr = false) {
+    let toastTimer = null;
+    function toast(msg, isErr = false, options = {}) {
+      const { persist = false, duration = 2800 } = options;
       const t = document.getElementById('toast');
+      if (toastTimer) {
+        clearTimeout(toastTimer);
+        toastTimer = null;
+      }
       document.getElementById('toast-msg').textContent = msg;
       t.style.borderLeftColor = isErr ? 'var(--error)' : 'var(--accent)';
       t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2800);
+      if (!persist) toastTimer = setTimeout(() => t.classList.remove('show'), duration);
     }
 
     async function api(path, opts = {}, retries = 1) {
@@ -1046,6 +1052,7 @@
         try {
           const kind = previewKindForFile(file);
           if (kind === 'image' || kind === 'video') { openUploadPreview(file); return; }
+          toast('Uploading payload...', false, { persist: true });
           await submitUpload(file);
           toast('Payload archived');
           await refreshAll();
@@ -1114,6 +1121,7 @@
     document.getElementById('preview-upload').onclick = async () => {
       if (!pendingUploadFile) return clearPendingPreview();
       const file = pendingUploadFile;
+      toast('Uploading payload...', false, { persist: true });
       try { await submitUpload(file); clearPendingPreview(); toast('Payload archived'); await refreshAll(); }
       catch (e) { toast(e.message || 'Upload failed', true); }
     };
