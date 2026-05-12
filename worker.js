@@ -1,6 +1,6 @@
 /* Cloudflare Worker */
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': 'https://everfast.imgfiles.net',
+  'Access-Control-Allow-Origin': 'https://ark.dockl.com',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Password',
 };
@@ -9,7 +9,7 @@ const GB = 1073741824;
 const UNLIMITED_STORAGE_CAP = -1;
 const UNLIMITED_STORAGE_ALIASES = ['unlimited', '∞', 'inf', 'infinite'];
 const BASE_STORAGE = 50 * GB;
-const FILE_LIMIT = 20 * 1024 * 1024;
+const FILE_LIMIT = 2000 * 1024 * 1024; // 2GB (Telegram MTProto limit via bridge)
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
 
@@ -363,43 +363,51 @@ async function uploadFile(request, env) {
   const formData = await request.formData();
   const file = formData.get('file');
   if (!file) return jsonError('File is required', 400, 'missing_file');
-  if (file.size > FILE_LIMIT) return jsonError('File exceeds 20MB limit', 413, 'file_too_large');
+  if (file.size > FILE_LIMIT) return jsonError('File exceeds 2GB limit', 413, 'file_too_large');
 
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=storage_used,storage_cap`);
   const u = users[0];
   if (!u) return jsonError('User not found', 404, 'user_not_found');
   const cap = Number(u.storage_cap);
   const isUnlimited = Number.isFinite(cap) && cap < 0;
-  if (!isUnlimited && (u.storage_used || 0) + file.size > (u.storage_cap || 0)) return jsonError('Storage full', 413, 'storage_full');
+  if (!isUnlimited && (u.storage_used || 0) + file.size > (u.storage_cap || 0)) {
+    return jsonError('Storage full', 413, 'storage_full');
+  }
 
-  const tgForm = new FormData();
-  tgForm.append('chat_id', env.CHAT_ID);
-  tgForm.append('caption', `👤 ${auth.email}\n📁 ${file.name}`);
+  // --- Upload via Hugging Face bridge (MTProto, supports up to 2GB) ---
+  const bridgeForm = new FormData();
+  bridgeForm.append('file', file, file.name);
 
-  let method = 'sendDocument';
-  const type = file.type || '';
-  if (type.startsWith('image/') && !file.name.endsWith('.gif')) method = 'sendPhoto';
-  else if (type.startsWith('video/')) method = 'sendVideo';
-  else if (type.startsWith('audio/')) method = 'sendAudio';
+  const bridgeRes = await fetch(`${env.BRIDGE_URL}/upload`, {
+    method: 'POST',
+    headers: {
+      'x-bridge-secret': env.BRIDGE_SECRET,
+      'x-user-email': auth.email,
+    },
+    body: bridgeForm,
+  });
 
-  const keyMap = { sendPhoto: 'photo', sendVideo: 'video', sendAudio: 'audio' };
-  const key = keyMap[method] || 'document';
-  tgForm.append(key, file, file.name);
+  if (!bridgeRes.ok) {
+    const err = await bridgeRes.json().catch(() => ({}));
+    return jsonError(err.detail || 'Upload bridge failed', 502, 'bridge_upload_failed');
+  }
 
-  const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/${method}`, { method: 'POST', body: tgForm });
-  const tgData = await tgRes.json();
-  if (!tgData.ok) return jsonError('Telegram upload failed', 502, 'telegram_upload_failed');
+  const bridgeData = await bridgeRes.json();
+  const fileId = bridgeData.file_id;
+  const messageId = bridgeData.message_id;
 
-  const msg = tgData.result;
-  const largestPhotoFileId = Array.isArray(msg.photo) && msg.photo.length > 0 ? msg.photo[msg.photo.length - 1].file_id : null;
-  const fileId = msg.document?.file_id || msg.video?.file_id || msg.audio?.file_id || largestPhotoFileId;
+  if (!fileId || !messageId) {
+    return jsonError('Bridge returned incomplete data', 502, 'bridge_invalid_response');
+  }
+  // --- End bridge upload ---
+
   const saved = await sbPost(env, 'files', {
     user_id: auth.userId,
     name: file.name,
     size: file.size,
     type: file.type,
     file_id: fileId,
-    message_id: msg.message_id,
+    message_id: messageId,
   });
 
   await sbPatch(env, `users?id=eq.${auth.userId}`, { storage_used: (u.storage_used || 0) + file.size });
