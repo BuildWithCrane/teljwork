@@ -40,10 +40,10 @@
         .modal-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
         @media (max-width: 640px) {
-            nav .container,
-            header.container,
-            main.container { padding-left: 1rem !important; padding-right: 1rem !important; }
-            header h1 { font-size: 2.75rem !important; }
+            body nav .container.mx-auto,
+            body header.container.mx-auto,
+            body main.container.mx-auto { padding-left: 1rem; padding-right: 1rem; }
+            .hero-mesh header.container h1 { font-size: 2.75rem; }
             .glass-card { border-radius: 1.5rem; }
             #crypto-modal { padding: 1rem; align-items: flex-end; }
             #crypto-modal .glass-card { max-width: 100%; border-radius: 1.25rem; padding: 1.25rem; }
