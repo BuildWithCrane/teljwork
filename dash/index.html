@@ -694,6 +694,7 @@
     if (!token) window.location.href = '/auth/';
 
     const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+    const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
     const state = {
       user: null,
       files: [],
@@ -1041,7 +1042,7 @@
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return;
-        if (file.size > 2000 * 1024 * 1024) return toast('Payload must be under 2GB.', true);
+        if (file.size > MAX_FILE_SIZE_BYTES) return toast('Payload must be under 2GB.', true);
         try {
           const kind = previewKindForFile(file);
           if (kind === 'image' || kind === 'video') { openUploadPreview(file); return; }

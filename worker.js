@@ -46,7 +46,6 @@ function serveAdminPage() {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ARK | Admin Console</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
@@ -62,8 +61,8 @@ function serveAdminPage() {
       --accent-soft: rgba(255,107,0,.12);
       --error: #ff4444;
       --success: #00cc66;
-      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-      --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     }
     * { box-sizing: border-box; }
     body {
@@ -193,6 +192,18 @@ function serveAdminPage() {
     .hint {
       margin: 10px 0 0;
       line-height: 1.55;
+    }
+    @media (max-width: 840px) {
+      .top { align-items: flex-start; flex-direction: column; }
+      .status-chip { width: 100%; text-align: center; }
+      table { min-width: 620px; }
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 20px 12px 18px; }
+      .card { padding: 14px; }
+      table { min-width: 540px; }
+      td .row { gap: 8px; }
+      td .row input { min-width: 190px; flex: 1; }
     }
   </style>
 </head>
