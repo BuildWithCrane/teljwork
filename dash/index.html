@@ -445,7 +445,7 @@
     .preview-thumb:hover { border-color: var(--accent); color: var(--text); }
     .preview-thumb.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
-    #files-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+    #overview-files, #files-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
 
     /* ── OVERVIEW FILE ACCENT ── */
     .file-icon-accent { color: var(--accent); margin-right: 10px; }
@@ -484,6 +484,10 @@
       body { display: block; overflow: auto; }
       .main { padding: 16px 16px 88px; min-height: 100vh; }
       .top { flex-direction: column; align-items: flex-start; }
+      #view-overview .row .btn,
+      #view-files .row .btn { width: 100%; }
+      #view-files .row input,
+      #view-files .row select { width: 100%; }
       #toast { left: 12px; right: 12px; bottom: 76px; }
     }
 
