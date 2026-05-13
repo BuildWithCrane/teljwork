@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ | ARK Documentation</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent: #ff6b00;
+            --bg: #ffffff;
+            --sidebar: #f8f8f8;
+            --text-main: #1a1a1a;
+            --text-sub: #666666;
+            --border: #eeeeee;
+            --code-bg: #f1f1f1;
+        }
+
+        * { box-sizing: border-box; scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 300px;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            padding: 40px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar .logo {
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-decoration: none;
+            color: var(--text-main);
+            display: block;
+            margin-bottom: 50px;
+        }
+
+        .nav-group { margin-bottom: 30px; }
+        .nav-group-title { 
+            font-size: 0.7rem; 
+            text-transform: uppercase; 
+            letter-spacing: 2px; 
+            color: var(--accent); 
+            font-weight: 800; 
+            margin-bottom: 15px;
+        }
+
+        .nav-link {
+            display: block;
+            text-decoration: none;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            transition: 0.2s;
+        }
+
+        .nav-link:hover { color: var(--text-main); padding-left: 5px; }
+
+        /* --- MAIN CONTENT --- */
+        main {
+            margin-left: 300px;
+            padding: 80px 10%;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        h1 { font-size: 3rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 10px; }
+        .subtitle { color: var(--text-sub); font-size: 1.2rem; margin-bottom: 60px; }
+
+        /* --- FAQ STYLING --- */
+        .faq-container { margin-top: 40px; }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+            padding: 25px 0;
+        }
+
+        .faq-question {
+            font-weight: 800;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-main);
+            transition: color 0.2s;
+        }
+
+        .faq-question:hover { color: var(--accent); }
+
+        .faq-answer {
+            margin-top: 15px;
+            color: var(--text-sub);
+            line-height: 1.8;
+            font-size: 1rem;
+            display: none; /* Hidden by default */
+            padding-right: 40px;
+        }
+
+        .faq-item.active .faq-answer { display: block; }
+        .faq-item.active .fa-chevron-down { transform: rotate(180deg); }
+
+        .fa-chevron-down { 
+            font-size: 0.8rem; 
+            transition: transform 0.3s; 
+            color: var(--text-sub);
+        }
+
+        .contact-box {
+            background: var(--text-main);
+            color: white;
+            padding: 40px;
+            border-radius: 4px;
+            margin-top: 80px;
+            text-align: center;
+        }
+
+        .contact-btn {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            font-weight: 800;
+            border-radius: 4px;
+            margin-top: 20px;
+            transition: 0.2s;
+        }
+
+        .contact-btn:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            main { margin-left: 0; padding: 40px 8%; }
+            h1 { font-size: 2.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <a href="index.html" class="logo">ARK</a>
+        
+        <div class="nav-group">
+            <div class="nav-group-title">The Basics</div>
+            <a href="docs.html#what-is-ark" class="nav-link">Back to Guide</a>
+            <a href="#privacy" class="nav-link">Privacy & Identity</a>
+            <a href="#payments" class="nav-link">Payments & Tiers</a>
+            <a href="#technical" class="nav-link">Technical Specs</a>
+        </div>
+    </nav>
+
+    <main>
+        <span style="color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">Resource Center</span>
+        <h1>Common Inquiries</h1>
+        <p class="subtitle">Everything you need to know about operating within the ARK ecosystem.</p>
+
+        <div class="faq-container">
+            
+            <!-- PRIVACY SECTION -->
+            <h2 id="privacy" style="margin-top: 60px; font-size: 1.4rem; border-bottom: 2px solid var(--text-main); padding-bottom: 10px;">Privacy & Identity</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">Why is there no "Forgot Password" option? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    ARK is built on a Zero-Knowledge architecture. We do not store your identity, email, or recovery phrases. If we had a way to reset your password, it would mean we had a back-door to your data. We don't. Keep your keys safe, or lose your data.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Does ARK log my IP address? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    Our Cloudflare Workers process requests in memory. We do not maintain logs of user IP addresses in our Supabase database. Your account is tied to your Vault ID and your payment hash—nothing else.
+                </div>
+            </div>
+
+            <!-- PAYMENTS SECTION -->
+            <h2 id="payments" style="margin-top: 60px; font-size: 1.4rem; border-bottom: 2px solid var(--text-main); padding-bottom: 10px;">Payments & Tiers</h2>
+
+            <div class="faq-item">
+                <div class="faq-question">How do I activate my tier after paying? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    Once you send <strong>BTC</strong> or <strong>LTC</strong>, copy the Transaction Hash (ID) from your wallet. Paste this into the "Activation" field in your dashboard. Our system verifies the blockchain record and upgrades your storage limit automatically.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Why don't you accept Credit Cards? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    Credit card processors demand "Know Your Customer" (KYC) data. To accept them, we would have to ask for your name and home address. We refuse to do that. Crypto allows for a "Value-for-Value" exchange without the surveillance.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">What is the Monero (XMR) verification process? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    Because Monero is fully private, our automated systems cannot "see" your transaction. Submit your hash in the dashboard, and an administrator will manually verify the receipt in our secure wallet. This usually takes less than 12 hours.
+                </div>
+            </div>
+
+            <!-- TECHNICAL SECTION -->
+            <h2 id="technical" style="margin-top: 60px; font-size: 1.4rem; border-bottom: 2px solid var(--text-main); padding-bottom: 10px;">Technical Specs</h2>
+
+            <div class="faq-item">
+                <div class="faq-question">Where is my data actually stored? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    Data is fragmented, encrypted with AES-256, and distributed across the ARK node network. No single node holds a complete, readable version of your file.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Can I use ARK via Terminal/CLI? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer">
+                    API access is currently in beta for <strong>Monolith</strong> tier users. Documentation for the ARK CLI will be released in Q3 2026.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="contact-box">
+            <h3>Still have questions?</h3>
+            <p>Our decentralized support desk is available for technical assistance.</p>
+            <a href="mailto:support@ark-cloud.com" class="contact-btn">Reach the Desk</a>
+        </div>
+
+        <footer style="margin-top: 100px; padding-top: 40px; border-top: 1px solid var(--border); color: var(--text-sub); font-size: 0.8rem;">
+            © 2026 ARK CLOUD SYSTEMS | FAQ v1.0 | No Tracking Active
+        </footer>
+    </main>
+
+    <script>
+        // Simple Accordion Logic
+        document.querySelectorAll('.faq-question').forEach(item => {
+            item.addEventListener('click', () => {
+                const parent = item.parentElement;
+                parent.classList.toggle('active');
+            });
+        });
+    </script>
+
+</body>
+</html>
