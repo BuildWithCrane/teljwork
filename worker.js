@@ -13,6 +13,7 @@ const FILE_LIMIT = 2000 * 1024 * 1024; // 2GB (Telegram MTProto limit via bridge
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
 const CRYPTO_DECIMALS = 8;
+const MINIMUM_CRYPTO_UNIT = 1 / 10 ** CRYPTO_DECIMALS;
 const PAYMENT_WALLETS = {
   BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
   LTC: 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr',
@@ -700,7 +701,8 @@ function resolveTierConfig(env, tierName) {
 }
 
 async function fetchCryptoRateEur(currency) {
-  const coinId = currency === 'BTC' ? 'bitcoin' : (currency === 'LTC' ? 'litecoin' : '');
+  const coinIdMap = { BTC: 'bitcoin', LTC: 'litecoin' };
+  const coinId = coinIdMap[currency] || '';
   if (!coinId) throw new Error('Unsupported rate lookup currency');
   const rateRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur`);
   if (!rateRes.ok) throw new Error('Failed to fetch exchange rate');
@@ -716,8 +718,9 @@ function btcAmountToCoin(amountInSmallestUnit) {
 
 function getBtcReceivedAmount(txData, walletAddress) {
   const outputs = Array.isArray(txData?.vout) ? txData.vout : [];
+  const normalizedWalletAddress = String(walletAddress || '').toLowerCase();
   return outputs.reduce((sum, output) => {
-    if (String(output?.scriptpubkey_address || '') !== walletAddress) return sum;
+    if (String(output?.scriptpubkey_address || '').toLowerCase() !== normalizedWalletAddress) return sum;
     return sum + btcAmountToCoin(output?.value);
   }, 0);
 }
@@ -796,7 +799,7 @@ async function verifyPayment(request, env) {
   const receivedAmount = await fetchReceivedAmount(currency, transactionHash, walletAddress);
   const eurRate = await fetchCryptoRateEur(currency);
   const requiredAmount = tier.priceEur / eurRate;
-  if (!(receivedAmount + (1 / 10 ** CRYPTO_DECIMALS) >= requiredAmount)) {
+  if (!(receivedAmount + MINIMUM_CRYPTO_UNIT >= requiredAmount)) {
     return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
   }
 
