@@ -844,7 +844,7 @@ async function verifyPayment(request, env) {
     }
     await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
       status: 'used_test_bypass_remove_before_live',
-      status_reason: 'REMOVE_BEFORE_GO_LIVE',
+      status_reason: 'remove_before_live',
       wallet_address: 'TEST_MODE_BYPASS_REMOVE_BEFORE_LIVE',
     });
     return jsonOk({
