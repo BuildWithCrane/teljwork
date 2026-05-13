@@ -234,7 +234,7 @@ function serveAdminPage() {
       <h1 class="card-title">Admin Authentication</h1>
       <div class="row">
         <input id="password" type="password" placeholder="Admin password" style="min-width:260px" />
-        <button id="load">Load Users</button>
+        <button id="load" type="button">Load Users</button>
       </div>
       <p class="muted hint">This endpoint is intentionally hidden. Access requires the worker env var <span class="mono">ADMIN_PASSWORD</span>.</p>
       <p class="muted hint">Use only over HTTPS.</p>
@@ -309,11 +309,11 @@ function serveAdminPage() {
           '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
           '<td><div class="row">' +
           '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + esc(limitGb) + '" data-cap="' + id + '" />' +
-          '<button data-save="' + id + '">Save</button>' +
+          '<button type="button" data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '<td><div class="row">' +
-          '<button class="btn-secondary" data-purge="' + id + '" data-email="' + esc(u.email || '') + '">Purge Files</button>' +
-          '<button class="btn-danger" data-delete="' + id + '" data-email="' + esc(u.email || '') + '">Delete Account</button>' +
+          '<button type="button" class="btn-secondary" data-purge="' + id + '" data-email="' + esc(u.email || '') + '">Purge Files</button>' +
+          '<button type="button" class="btn-danger" data-delete="' + id + '" data-email="' + esc(u.email || '') + '">Delete Account</button>' +
           '</div></td>' +
           '</tr>';
       }).join('');
@@ -414,11 +414,14 @@ function serveAdminPage() {
     }
 
     async function loadUsers() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       try {
         const res = await fetch('/admin/users', {
           headers: { Authorization: 'Bearer ' + adminPassword },
+          signal: controller.signal,
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load users');
         users = Array.isArray(data.users) ? data.users : [];
         renderUsers();
@@ -426,18 +429,36 @@ function serveAdminPage() {
       } catch (err) {
         users = [];
         renderUsers();
-        setStatus(err.message || 'Failed to load users', 'error');
+        const message = (err && err.name === 'AbortError')
+          ? 'Request timed out while loading users.'
+          : (err && err.message) || 'Failed to load users';
+        setStatus(message, 'error');
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
-    document.getElementById('load').addEventListener('click', async () => {
-      adminPassword = document.getElementById('password').value;
+    const loadBtn = document.getElementById('load');
+    const passwordInput = document.getElementById('password');
+    async function handleLoadClick() {
+      adminPassword = String(passwordInput.value || '').trim();
       if (!adminPassword) {
         setStatus('Enter admin password first.', 'error');
         return;
       }
       setStatus('Loading users...');
-      await loadUsers();
+      loadBtn.disabled = true;
+      try {
+        await loadUsers();
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+    loadBtn.addEventListener('click', handleLoadClick);
+    passwordInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      handleLoadClick();
     });
   </script>
 </body>
