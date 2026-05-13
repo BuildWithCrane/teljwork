@@ -307,6 +307,72 @@
             pointer-events: none;
         }
 
+        .payment-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .payment-modal[aria-hidden="true"] {
+            display: none;
+        }
+
+        .payment-card {
+            width: 100%;
+            max-width: 540px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-top: 6px solid var(--accent);
+            border-radius: 4px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+            padding: 28px;
+        }
+
+        .payment-wallet {
+            margin-top: 14px;
+            margin-bottom: 20px;
+            background: #f7f7f7;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            word-break: break-all;
+        }
+
+        .payment-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px 14px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text-main);
+            background: white;
+        }
+
+        .payment-input:focus {
+            outline: 2px solid var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .payment-status {
+            min-height: 24px;
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        .payment-status.error {
+            color: #b00020;
+        }
+
         footer {
             padding: 60px 8%;
             text-align: center;
@@ -496,7 +562,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-clock" style="color: var(--accent); margin-right: 12px;"></i> 1-3 Min Retrieval</li>
                 </ul>
-                <a href="#" class="btn">Deploy Vault</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="pro" data-plan="Vault">Deploy Vault</a>
             </div>
 
             <!-- MONOLITH TIER -->
@@ -509,7 +575,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-layer-group" style="color: var(--accent); margin-right: 12px;"></i> Creator Slot Status</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-code" style="color: var(--accent); margin-right: 12px;"></i> Full API Access</li>
                 </ul>
-                <a href="#" class="btn" style="background: var(--accent);">Deploy Monolith</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="creator" data-plan="Monolith" style="background: var(--accent);">Deploy Monolith</a>
             </div>
 
             <!-- COLOSSUS TIER -->
@@ -522,7 +588,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-microchip" style="color: var(--accent); margin-right: 12px;"></i> Priority Reassembly</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-link-slash" style="color: var(--accent); margin-right: 12px;"></i> Anonymous Payment</li>
                 </ul>
-                <a href="#" class="btn">Deploy Colossus</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="studio" data-plan="Colossus">Deploy Colossus</a>
             </div>
         </div>
 
@@ -537,7 +603,39 @@
         <p style="color: var(--text-sub); font-size: 0.75rem; margin: 0;">© 2026 ARK CLOUD SYSTEMS. ALL RIGHTS RESERVED.</p>
     </footer>
 
+    <div id="btc-payment-modal" class="payment-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="btc-payment-title">
+        <div class="payment-card">
+            <h3 id="btc-payment-title" style="margin: 0; text-transform: uppercase; letter-spacing: 1px;">Verify BTC Payment</h3>
+            <p style="margin: 10px 0 0; color: var(--text-sub); font-size: 0.85rem;">Send BTC to this wallet, then submit your transaction hash.</p>
+            <div id="btc-payment-wallet" class="payment-wallet"></div>
+            <form id="btc-payment-form">
+                <label for="btc-transaction-hash" style="display: block; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;">Transaction Hash</label>
+                <input id="btc-transaction-hash" class="payment-input" autocomplete="off" spellcheck="false" required />
+                <div id="btc-payment-status" class="payment-status" role="status" aria-live="polite"></div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <button id="btc-payment-cancel" type="button" class="btn" style="flex: 1; background: #ededed; color: #666;">Cancel</button>
+                    <button id="btc-payment-submit" type="submit" class="btn" style="flex: 1;">Verify BTC Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        const DEFAULT_WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+        const DEFAULT_BTC_WALLET = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
+        const WORKER_URL = String(window.ARK_WORKER_URL || DEFAULT_WORKER_URL).trim();
+        const BTC_WALLET = String(window.ARK_BTC_WALLET || DEFAULT_BTC_WALLET).trim();
+        const REDIRECT_DELAY_MS = 500;
+        const paymentModal = document.getElementById('btc-payment-modal');
+        const paymentForm = document.getElementById('btc-payment-form');
+        const paymentWallet = document.getElementById('btc-payment-wallet');
+        const paymentTitle = document.getElementById('btc-payment-title');
+        const paymentStatus = document.getElementById('btc-payment-status');
+        const paymentHashInput = document.getElementById('btc-transaction-hash');
+        const paymentSubmitBtn = document.getElementById('btc-payment-submit');
+        const paymentCancelBtn = document.getElementById('btc-payment-cancel');
+        const paymentFlow = { activeButton: null, tierName: '', planName: '', token: '' };
+
         function toggleMenu() {
             const toggle = document.querySelector('.menu-toggle');
             const overlay = document.querySelector('.mobile-overlay');
@@ -545,6 +643,138 @@
             overlay.classList.toggle('active');
             document.body.style.overflow = overlay.classList.contains('active') ? 'hidden' : 'auto';
         }
+
+        async function fetchCurrentUser(token) {
+            const res = await fetch(`${WORKER_URL}/auth/me`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => {
+                throw new Error('Failed to load account session: invalid server response');
+            });
+            if (!res.ok || !data.ok || !data.id) {
+                throw new Error(data.error || 'Failed to load account session');
+            }
+            return data;
+        }
+
+        async function submitBtcVerification(token, userId, tierName, transactionHash) {
+            const res = await fetch(`${WORKER_URL}/verify-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    userId,
+                    tierName,
+                    currency: 'BTC',
+                    transactionHash,
+                }),
+            });
+            const data = await res.json().catch(() => {
+                throw new Error('Payment verification failed: invalid server response');
+            });
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Payment verification failed');
+            }
+            return data;
+        }
+
+        function setPaymentStatus(message, isError = false) {
+            paymentStatus.textContent = message || '';
+            paymentStatus.classList.toggle('error', !!isError);
+        }
+
+        function closePaymentModal() {
+            paymentModal.setAttribute('aria-hidden', 'true');
+            paymentHashInput.value = '';
+            setPaymentStatus('');
+            window.removeEventListener('keydown', handleModalEscape);
+        }
+
+        function openPaymentModal(planName, tierName, token, button) {
+            paymentFlow.activeButton = button;
+            paymentFlow.tierName = tierName;
+            paymentFlow.planName = planName;
+            paymentFlow.token = token;
+            paymentTitle.textContent = `Verify BTC Payment · ${planName}`;
+            paymentWallet.textContent = BTC_WALLET;
+            paymentModal.setAttribute('aria-hidden', 'false');
+            window.addEventListener('keydown', handleModalEscape);
+            paymentHashInput.focus();
+        }
+
+        function lockPaymentButton(button, locked) {
+            if (!button) return;
+            if (locked) {
+                if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '';
+                button.textContent = 'Verifying...';
+                button.style.pointerEvents = 'none';
+                paymentSubmitBtn.disabled = true;
+            } else {
+                button.textContent = button.dataset.originalText || button.textContent;
+                button.style.pointerEvents = '';
+                paymentSubmitBtn.disabled = false;
+            }
+        }
+
+        async function handleBtcPayment(event) {
+            event.preventDefault();
+            const btn = event.currentTarget;
+            const tierName = String(btn.dataset.tier || '').trim();
+            const planName = String(btn.dataset.plan || tierName || 'tier').trim();
+            if (!tierName) return;
+            const token = localStorage.getItem('jwork_token');
+            if (!token) {
+                window.location.href = '/auth/';
+                return;
+            }
+            openPaymentModal(planName, tierName, token, btn);
+        }
+
+        function handleModalEscape(event) {
+            if (event.key !== 'Escape') return;
+            lockPaymentButton(paymentFlow.activeButton, false);
+            closePaymentModal();
+        }
+
+        paymentForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const transactionHash = String(paymentHashInput.value || '').trim();
+            if (!transactionHash) {
+                setPaymentStatus('Transaction hash is required.', true);
+                paymentHashInput.focus();
+                return;
+            }
+            lockPaymentButton(paymentFlow.activeButton, true);
+            setPaymentStatus('Verifying payment...');
+            try {
+                const user = await fetchCurrentUser(paymentFlow.token);
+                await submitBtcVerification(paymentFlow.token, user.id, paymentFlow.tierName, transactionHash);
+                setPaymentStatus('Payment verified. Redirecting to your vault...');
+                setTimeout(() => {
+                    window.location.href = '/dash/';
+                }, REDIRECT_DELAY_MS);
+            } catch (err) {
+                setPaymentStatus(err.message || 'Unable to verify payment right now.', true);
+                lockPaymentButton(paymentFlow.activeButton, false);
+            }
+        });
+
+        paymentCancelBtn.addEventListener('click', () => {
+            lockPaymentButton(paymentFlow.activeButton, false);
+            closePaymentModal();
+        });
+        paymentModal.addEventListener('click', (event) => {
+            if (event.target === paymentModal) {
+                lockPaymentButton(paymentFlow.activeButton, false);
+                closePaymentModal();
+            }
+        });
+        document.querySelectorAll('.js-btc-pay-btn').forEach((btn) => {
+            btn.addEventListener('click', handleBtcPayment);
+        });
     </script>
 
 </body>
