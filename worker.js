@@ -14,6 +14,10 @@ const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
 const CRYPTO_DECIMALS = 8;
 const MINIMUM_CRYPTO_UNIT = 1 / 10 ** CRYPTO_DECIMALS;
+const EXTERNAL_API_TIMEOUT_MS = 15000;
+const EXTERNAL_API_RETRIES = 1;
+const RATE_CACHE_TTL_MS = 60000;
+const RATE_CACHE = new Map();
 const PAYMENT_WALLETS = {
   BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
   LTC: 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr',
@@ -704,11 +708,17 @@ async function fetchCryptoRateEur(currency) {
   const coinIdMap = { BTC: 'bitcoin', LTC: 'litecoin' };
   const coinId = coinIdMap[currency] || '';
   if (!coinId) throw new Error('Unsupported rate lookup currency');
-  const rateRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur`);
-  if (!rateRes.ok) throw new Error('Failed to fetch exchange rate');
-  const rateData = await rateRes.json().catch(() => ({}));
+  const now = Date.now();
+  const cached = RATE_CACHE.get(coinId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const rateData = await fetchJsonFromApi(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur`,
+    'Failed to fetch exchange rate'
+  );
   const eurRate = Number(rateData?.[coinId]?.eur);
   if (!Number.isFinite(eurRate) || eurRate <= 0) throw new Error('Invalid exchange rate response');
+  RATE_CACHE.set(coinId, { value: eurRate, expiresAt: now + RATE_CACHE_TTL_MS });
   return eurRate;
 }
 
@@ -736,15 +746,14 @@ function getLtcReceivedAmount(txData, transactionHash, walletAddress) {
 
 async function fetchReceivedAmount(currency, transactionHash, walletAddress) {
   if (currency === 'BTC') {
-    const txRes = await fetch(`https://mempool.space/api/tx/${enc(transactionHash)}`);
-    if (!txRes.ok) throw new Error('Unable to fetch BTC transaction');
-    const txData = await txRes.json().catch(() => ({}));
+    const txData = await fetchJsonFromApi(`https://mempool.space/api/tx/${enc(transactionHash)}`, 'Unable to fetch BTC transaction');
     return getBtcReceivedAmount(txData, walletAddress);
   }
   if (currency === 'LTC') {
-    const txRes = await fetch(`https://blockchair.com/litecoin/dashboards/transaction/${enc(transactionHash)}`);
-    if (!txRes.ok) throw new Error('Unable to fetch LTC transaction');
-    const txData = await txRes.json().catch(() => ({}));
+    const txData = await fetchJsonFromApi(
+      `https://blockchair.com/litecoin/dashboards/transaction/${enc(transactionHash)}`,
+      'Unable to fetch LTC transaction'
+    );
     return getLtcReceivedAmount(txData, transactionHash, walletAddress);
   }
   throw new Error('Unsupported currency');
@@ -756,11 +765,42 @@ async function ensurePaymentNotProcessed(env, transactionHash) {
   return null;
 }
 
-async function recordPayment(env, payload) {
-  await sbPost(env, 'payments', payload);
+async function claimPayment(env, payload) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/payments?on_conflict=transaction_hash`, {
+    method: 'POST',
+    headers: { ...sbHeaders(env), Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const rows = await res.json().catch(() => []);
+  return rows[0] || null;
+}
+
+async function fetchJsonFromApi(url, defaultErrorMessage) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= EXTERNAL_API_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_API_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`${defaultErrorMessage}: HTTP ${response.status}`);
+      const data = await response.json().catch(() => null);
+      if (!data) throw new Error(`${defaultErrorMessage}: invalid JSON`);
+      return data;
+    } catch (err) {
+      lastError = err;
+      if (attempt === EXTERNAL_API_RETRIES) throw new Error(lastError?.message || defaultErrorMessage);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw new Error(lastError?.message || defaultErrorMessage);
 }
 
 async function verifyPayment(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
   const tierName = String(body.tierName || '').trim();
@@ -769,12 +809,21 @@ async function verifyPayment(request, env) {
   if (!userId || !tierName || !currency || !transactionHash) {
     return jsonError('userId, tierName, currency, and transactionHash are required', 400, 'missing_payment_fields');
   }
+  if (auth.userId !== userId) return jsonError('Forbidden', 403, 'forbidden');
 
   const duplicateError = await ensurePaymentNotProcessed(env, transactionHash);
   if (duplicateError) return duplicateError;
 
   const tier = resolveTierConfig(env, tierName);
   if (!tier) return jsonError('Unknown tierName or invalid tier config', 400, 'invalid_tier');
+  const claimed = await claimPayment(env, {
+    user_id: userId,
+    tier_name: tier.name,
+    currency,
+    transaction_hash: transactionHash,
+    status: 'processing',
+  });
+  if (!claimed) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
 
   if (currency === 'XMR') {
     await sbPost(env, 'manual_verifications', {
@@ -785,12 +834,9 @@ async function verifyPayment(request, env) {
       status: 'Pending',
       wallet_address: PAYMENT_WALLETS.XMR,
     });
-    await recordPayment(env, {
-      user_id: userId,
-      tier_name: tier.name,
-      currency,
-      transaction_hash: transactionHash,
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
       status: 'pending_manual',
+      wallet_address: PAYMENT_WALLETS.XMR,
     });
     return jsonOk({ status: 'Pending', manualReview: true });
   }
@@ -799,19 +845,23 @@ async function verifyPayment(request, env) {
   const receivedAmount = await fetchReceivedAmount(currency, transactionHash, walletAddress);
   const eurRate = await fetchCryptoRateEur(currency);
   const requiredAmount = tier.priceEur / eurRate;
-  if (!(receivedAmount + MINIMUM_CRYPTO_UNIT >= requiredAmount)) {
+  if (receivedAmount + MINIMUM_CRYPTO_UNIT < requiredAmount) {
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'rejected_insufficient_amount' });
     return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
   }
 
   const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
-  if (!updatedProfile.length) return jsonError('Profile not found', 404, 'profile_not_found');
+  if (!updatedProfile.length) {
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
+    return jsonError('Profile not found', 404, 'profile_not_found');
+  }
 
-  await recordPayment(env, {
-    user_id: userId,
-    tier_name: tier.name,
-    currency,
-    transaction_hash: transactionHash,
+  const receivedAmountUnits = Math.round(receivedAmount * 10 ** CRYPTO_DECIMALS);
+  const requiredAmountUnits = Math.ceil(requiredAmount * 10 ** CRYPTO_DECIMALS);
+  await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
     wallet_address: walletAddress,
+    amount_received_units: receivedAmountUnits,
+    amount_required_units: requiredAmountUnits,
     amount_received: Number(receivedAmount.toFixed(CRYPTO_DECIMALS)),
     amount_required: Number(requiredAmount.toFixed(CRYPTO_DECIMALS)),
     status: 'used',
