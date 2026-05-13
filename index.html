@@ -621,8 +621,11 @@
     </div>
 
     <script>
-        const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
-        const BTC_WALLET = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
+        const DEFAULT_WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+        const DEFAULT_BTC_WALLET = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
+        const WORKER_URL = String(window.ARK_WORKER_URL || DEFAULT_WORKER_URL).trim();
+        const BTC_WALLET = String(window.ARK_BTC_WALLET || DEFAULT_BTC_WALLET).trim();
+        const REDIRECT_DELAY_MS = 500;
         const paymentModal = document.getElementById('btc-payment-modal');
         const paymentForm = document.getElementById('btc-payment-form');
         const paymentWallet = document.getElementById('btc-payment-wallet');
@@ -646,7 +649,9 @@
                 method: 'GET',
                 headers: { Authorization: `Bearer ${token}` },
             });
-            const data = await res.json().catch(() => ({}));
+            const data = await res.json().catch(() => {
+                throw new Error('Failed to load account session: invalid server response');
+            });
             if (!res.ok || !data.ok || !data.id) {
                 throw new Error(data.error || 'Failed to load account session');
             }
@@ -667,7 +672,9 @@
                     transactionHash,
                 }),
             });
-            const data = await res.json().catch(() => ({}));
+            const data = await res.json().catch(() => {
+                throw new Error('Payment verification failed: invalid server response');
+            });
             if (!res.ok || !data.ok) {
                 throw new Error(data.error || 'Payment verification failed');
             }
@@ -683,6 +690,7 @@
             paymentModal.setAttribute('aria-hidden', 'true');
             paymentHashInput.value = '';
             setPaymentStatus('');
+            window.removeEventListener('keydown', handleModalEscape);
         }
 
         function openPaymentModal(planName, tierName, token, button) {
@@ -693,6 +701,8 @@
             paymentTitle.textContent = `Verify BTC Payment · ${planName}`;
             paymentWallet.textContent = BTC_WALLET;
             paymentModal.setAttribute('aria-hidden', 'false');
+            window.removeEventListener('keydown', handleModalEscape);
+            window.addEventListener('keydown', handleModalEscape);
             paymentHashInput.focus();
         }
 
@@ -724,6 +734,12 @@
             openPaymentModal(planName, tierName, token, btn);
         }
 
+        function handleModalEscape(event) {
+            if (event.key !== 'Escape' || paymentModal.getAttribute('aria-hidden') === 'true') return;
+            lockPaymentButton(paymentFlow.activeButton, false);
+            closePaymentModal();
+        }
+
         paymentForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const transactionHash = String(paymentHashInput.value || '').trim();
@@ -740,7 +756,7 @@
                 setPaymentStatus('Payment verified. Redirecting to your vault...');
                 setTimeout(() => {
                     window.location.href = '/dash/';
-                }, 500);
+                }, REDIRECT_DELAY_MS);
             } catch (err) {
                 setPaymentStatus(err.message || 'Unable to verify payment right now.', true);
                 lockPaymentButton(paymentFlow.activeButton, false);
@@ -757,13 +773,6 @@
                 closePaymentModal();
             }
         });
-        window.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && paymentModal.getAttribute('aria-hidden') === 'false') {
-                lockPaymentButton(paymentFlow.activeButton, false);
-                closePaymentModal();
-            }
-        });
-
         document.querySelectorAll('.js-btc-pay-btn').forEach((btn) => {
             btn.addEventListener('click', handleBtcPayment);
         });
