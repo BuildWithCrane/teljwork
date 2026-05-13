@@ -534,7 +534,8 @@
 
         <!-- PRIVACY BADGE -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-            <i class="fab fa-bitcoin" style="color: var(--accent);"></i> Privacy Guaranteed: We accept BTC, ETH, and XMR
+            <i class="fa-solid fa-shield-halved" style="color: var(--accent);"></i>
+            Privacy Guaranteed: We accept BTC, LTC, and XMR
         </div>
 
         <div class="price-container">
@@ -634,7 +635,12 @@
         const paymentHashInput = document.getElementById('btc-transaction-hash');
         const paymentSubmitBtn = document.getElementById('btc-payment-submit');
         const paymentCancelBtn = document.getElementById('btc-payment-cancel');
-        const paymentFlow = { activeButton: null, tierName: '', planName: '', token: '' };
+        const paymentFlow = {
+            activeButton: null,
+            tierName: '',
+            planName: '',
+            token: ''
+        };
 
         function toggleMenu() {
             const toggle = document.querySelector('.menu-toggle');
@@ -647,7 +653,9 @@
         async function fetchCurrentUser(token) {
             const res = await fetch(`${WORKER_URL}/auth/me`, {
                 method: 'GET',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
             });
             const data = await res.json().catch(() => {
                 throw new Error('Failed to load account session: invalid server response');
