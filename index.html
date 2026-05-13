@@ -701,7 +701,6 @@
             paymentTitle.textContent = `Verify BTC Payment · ${planName}`;
             paymentWallet.textContent = BTC_WALLET;
             paymentModal.setAttribute('aria-hidden', 'false');
-            window.removeEventListener('keydown', handleModalEscape);
             window.addEventListener('keydown', handleModalEscape);
             paymentHashInput.focus();
         }
@@ -735,7 +734,7 @@
         }
 
         function handleModalEscape(event) {
-            if (event.key !== 'Escape' || paymentModal.getAttribute('aria-hidden') === 'true') return;
+            if (event.key !== 'Escape') return;
             lockPaymentButton(paymentFlow.activeButton, false);
             closePaymentModal();
         }
