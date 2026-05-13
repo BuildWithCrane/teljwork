@@ -21,6 +21,8 @@ export default {
       if (pathname === '/admin' && request.method === 'GET') return serveAdminPage();
       if (pathname === '/admin/users' && request.method === 'GET') return listAdminUsers(request, env);
       if (pathname === '/admin/users/storage-limit' && request.method === 'POST') return updateUserStorageLimit(request, env);
+      if (pathname === '/admin/users/delete' && request.method === 'POST') return adminDeleteUser(request, env);
+      if (pathname === '/admin/users/purge-files' && request.method === 'POST') return adminPurgeUserFiles(request, env);
 
       if (pathname === '/auth/register' && request.method === 'POST') return register(request, env);
       if (pathname === '/auth/login' && request.method === 'POST') return login(request, env);
@@ -165,6 +167,16 @@ function serveAdminPage() {
     }
     button:hover { filter: brightness(1.03); }
     button:disabled { opacity: .65; cursor: not-allowed; }
+    button.btn-danger {
+      background: var(--error);
+      border-color: var(--error);
+      color: #fff;
+    }
+    button.btn-secondary {
+      background: var(--surface-accent);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
     table { width: 100%; border-collapse: collapse; min-width: 760px; }
     th, td {
       text-align: left;
@@ -242,10 +254,11 @@ function serveAdminPage() {
               <th>Used</th>
               <th>Limit</th>
               <th>Set new limit (GB or unlimited)</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="4" class="muted">Enter password and load users.</td></tr>
+            <tr><td colspan="5" class="muted">Enter password and load users.</td></tr>
           </tbody>
         </table>
       </div>
@@ -282,7 +295,7 @@ function serveAdminPage() {
       document.getElementById('count').textContent = String(users.length) + ' user' + (users.length === 1 ? '' : 's');
 
       if (!users.length) {
-        body.innerHTML = '<tr><td colspan="4" class="muted">No users found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" class="muted">No users found.</td></tr>';
         return;
       }
 
@@ -297,6 +310,10 @@ function serveAdminPage() {
           '<td><div class="row">' +
           '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + esc(limitGb) + '" data-cap="' + id + '" />' +
           '<button data-save="' + id + '">Save</button>' +
+          '</div></td>' +
+          '<td><div class="row">' +
+          '<button class="btn-secondary" data-purge="' + id + '" data-email="' + esc(u.email || '') + '">Purge Files</button>' +
+          '<button class="btn-danger" data-delete="' + id + '" data-email="' + esc(u.email || '') + '">Delete Account</button>' +
           '</div></td>' +
           '</tr>';
       }).join('');
@@ -335,6 +352,60 @@ function serveAdminPage() {
             await loadUsers();
           } catch (err) {
             setStatus(err.message || 'Update failed', 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      body.querySelectorAll('button[data-purge]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.getAttribute('data-purge');
+          const email = btn.getAttribute('data-email') || userId;
+          if (!confirm('Purge ALL files for ' + email + '?\n\nThis will delete every file from storage. The account will remain. This cannot be undone.')) return;
+          btn.disabled = true;
+          try {
+            const res = await fetch('/admin/users/purge-files', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + adminPassword,
+              },
+              body: JSON.stringify({ userId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Purge failed');
+            setStatus('Files purged for ' + email + '.', 'ok');
+            await loadUsers();
+          } catch (err) {
+            setStatus(err.message || 'Purge failed', 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      body.querySelectorAll('button[data-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.getAttribute('data-delete');
+          const email = btn.getAttribute('data-email') || userId;
+          if (!confirm('Permanently delete account for ' + email + '?\n\nThis will delete all files AND the account. This cannot be undone.')) return;
+          btn.disabled = true;
+          try {
+            const res = await fetch('/admin/users/delete', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + adminPassword,
+              },
+              body: JSON.stringify({ userId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Delete failed');
+            setStatus('Account deleted for ' + email + '.', 'ok');
+            await loadUsers();
+          } catch (err) {
+            setStatus(err.message || 'Delete failed', 'error');
           } finally {
             btn.disabled = false;
           }
@@ -407,6 +478,57 @@ async function updateUserStorageLimit(request, env) {
 
   const updated = await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_cap: storageCapBytes });
   return jsonOk({ user: updated[0] || { ...current, storage_cap: storageCapBytes } });
+}
+
+async function deleteUserFiles(userId, env) {
+  const files = await sbGet(env, `files?user_id=eq.${enc(userId)}&select=id,message_id`);
+  await Promise.allSettled(
+    files.map((f) =>
+      fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/deleteMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: env.CHAT_ID, message_id: f.message_id }),
+      })
+    )
+  );
+  if (files.length) {
+    await sbDelete(env, `files?user_id=eq.${enc(userId)}`);
+  }
+  return files.length;
+}
+
+async function adminPurgeUserFiles(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
+
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+
+  const purged = await deleteUserFiles(userId, env);
+  await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_used: 0 });
+
+  return jsonOk({ purged });
+}
+
+async function adminDeleteUser(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
+
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+
+  const filesRemoved = await deleteUserFiles(userId, env);
+  await sbDelete(env, `users?id=eq.${enc(userId)}`);
+
+  return jsonOk({ deleted: true, filesRemoved });
 }
 
 function parseStorageCapBytes(body) {
