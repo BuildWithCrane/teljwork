@@ -496,7 +496,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-clock" style="color: var(--accent); margin-right: 12px;"></i> 1-3 Min Retrieval</li>
                 </ul>
-                <a href="#" class="btn">Deploy Vault</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="pro" data-plan="Vault">Deploy Vault</a>
             </div>
 
             <!-- MONOLITH TIER -->
@@ -509,7 +509,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-layer-group" style="color: var(--accent); margin-right: 12px;"></i> Creator Slot Status</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-code" style="color: var(--accent); margin-right: 12px;"></i> Full API Access</li>
                 </ul>
-                <a href="#" class="btn" style="background: var(--accent);">Deploy Monolith</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="creator" data-plan="Monolith" style="background: var(--accent);">Deploy Monolith</a>
             </div>
 
             <!-- COLOSSUS TIER -->
@@ -522,7 +522,7 @@
                     <li style="margin-bottom: 15px;"><i class="fas fa-microchip" style="color: var(--accent); margin-right: 12px;"></i> Priority Reassembly</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-link-slash" style="color: var(--accent); margin-right: 12px;"></i> Anonymous Payment</li>
                 </ul>
-                <a href="#" class="btn">Deploy Colossus</a>
+                <a href="#" class="btn js-btc-pay-btn" data-tier="studio" data-plan="Colossus">Deploy Colossus</a>
             </div>
         </div>
 
@@ -538,6 +538,9 @@
     </footer>
 
     <script>
+        const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+        const BTC_WALLET = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
+
         function toggleMenu() {
             const toggle = document.querySelector('.menu-toggle');
             const overlay = document.querySelector('.mobile-overlay');
@@ -545,6 +548,79 @@
             overlay.classList.toggle('active');
             document.body.style.overflow = overlay.classList.contains('active') ? 'hidden' : 'auto';
         }
+
+        async function fetchCurrentUser(token) {
+            const res = await fetch(`${WORKER_URL}/auth/me`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok || !data.id) {
+                throw new Error(data.error || 'Failed to load account session');
+            }
+            return data;
+        }
+
+        async function submitBtcVerification(token, userId, tierName, transactionHash) {
+            const res = await fetch(`${WORKER_URL}/verify-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    userId,
+                    tierName,
+                    currency: 'BTC',
+                    transactionHash,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Payment verification failed');
+            }
+            return data;
+        }
+
+        async function handleBtcPayment(event) {
+            event.preventDefault();
+            const btn = event.currentTarget;
+            const tierName = String(btn.dataset.tier || '').trim();
+            const planName = String(btn.dataset.plan || tierName || 'tier').trim();
+            if (!tierName) return;
+
+            const token = localStorage.getItem('jwork_token');
+            if (!token) {
+                alert('Sign in is required before verifying BTC payments.');
+                window.location.href = '/auth/';
+                return;
+            }
+
+            const transactionHash = prompt(
+                `BTC Wallet for ${planName}:\n${BTC_WALLET}\n\nAfter sending payment, paste your BTC transaction hash to verify:`
+            );
+            const normalizedHash = String(transactionHash || '').trim();
+            if (!normalizedHash) return;
+
+            const originalText = btn.textContent;
+            btn.textContent = 'Verifying...';
+            btn.style.pointerEvents = 'none';
+            try {
+                const user = await fetchCurrentUser(token);
+                await submitBtcVerification(token, user.id, tierName, normalizedHash);
+                alert(`BTC payment verified for ${planName}. Your storage tier has been updated.`);
+                window.location.href = '/dash/';
+            } catch (err) {
+                alert(err.message || 'Unable to verify payment right now.');
+            } finally {
+                btn.textContent = originalText;
+                btn.style.pointerEvents = '';
+            }
+        }
+
+        document.querySelectorAll('.js-btc-pay-btn').forEach((btn) => {
+            btn.addEventListener('click', handleBtcPayment);
+        });
     </script>
 
 </body>
