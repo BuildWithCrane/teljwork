@@ -431,7 +431,7 @@ function serveAdminPage() {
         users = [];
         renderUsers();
         let message = 'Failed to load users';
-        if (err instanceof DOMException && err.name === 'AbortError') {
+        if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') {
           message = 'Request timed out while loading users.';
         } else if (err instanceof Error && err.message) {
           message = err.message;
