@@ -12,6 +12,25 @@ const BASE_STORAGE = 50 * GB;
 const FILE_LIMIT = 2000 * 1024 * 1024; // 2GB (Telegram MTProto limit via bridge)
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
+const CRYPTO_DECIMALS = 8;
+const PAYMENT_TOLERANCE = 1 / 10 ** CRYPTO_DECIMALS;
+const EXTERNAL_API_TIMEOUT_MS = 15000;
+const EXTERNAL_API_RETRIES = 1;
+const RATE_CACHE_TTL_MS = 60000;
+const RATE_CACHE = new Map();
+const EXTERNAL_ERROR_BODY_MAX_LENGTH = 240;
+const TEST_MODE_BYPASS_HASH = 'ARK_TEST_BYPASS'; // REMOVE BEFORE GOING LIVE
+const PAYMENT_WALLETS = {
+  BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
+  LTC: 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr',
+  XMR: '4254cXFs8vLXCEVm1T7TDAdovjqMiNZX8aym8DiMM2EiUVbDnhRQt6uauFyTeP2pkqXtcodDWPoPg1nrQNsz8xuqP3q3rrQ',
+};
+const DEFAULT_TIER_CONFIG = {
+  starter: { priceEur: 0, storageLimit: 50 * GB },
+  pro: { priceEur: 1.99, storageLimit: 250 * GB },
+  creator: { priceEur: 4.99, storageLimit: 1024 * GB },
+  studio: { priceEur: 14.99, storageLimit: 5 * 1024 * GB },
+};
 
 export default {
   async fetch(request, env) {
@@ -27,6 +46,7 @@ export default {
       if (pathname === '/auth/register' && request.method === 'POST') return register(request, env);
       if (pathname === '/auth/login' && request.method === 'POST') return login(request, env);
       if (pathname === '/auth/me' && request.method === 'GET') return getMe(request, env);
+      if (pathname === '/verify-payment' && request.method === 'POST') return verifyPayment(request, env);
 
       if (pathname === '/files/upload' && request.method === 'POST') return uploadFile(request, env);
       if (pathname === '/files' && request.method === 'GET') return listFiles(request, env);
@@ -658,6 +678,237 @@ async function getMe(request, env) {
   return users.length ? jsonOk(users[0]) : jsonError('User not found', 404, 'user_not_found');
 }
 
+function normalizePaymentCurrency(currency) {
+  const value = String(currency || '').trim().toUpperCase();
+  return ['BTC', 'LTC', 'XMR'].includes(value) ? value : '';
+}
+
+function normalizeTransactionHash(transactionHash) {
+  return String(transactionHash || '').trim();
+}
+
+function isTestModeBypassHash(transactionHash, env) {
+  const enabled = String(env?.ENABLE_TEST_MODE || '').toLowerCase() === 'true'; // REMOVE BEFORE GOING LIVE
+  return enabled && String(transactionHash || '').trim() === TEST_MODE_BYPASS_HASH;
+}
+
+function tierConfigFromEnv(env) {
+  const raw = String(env.PAYMENT_TIER_CONFIG || '').trim();
+  if (!raw) return DEFAULT_TIER_CONFIG;
+  const parsed = safeJson(raw);
+  return parsed && typeof parsed === 'object' ? parsed : DEFAULT_TIER_CONFIG;
+}
+
+function resolveTierConfig(env, tierName) {
+  const normalizedTier = String(tierName || '').trim().toLowerCase();
+  if (!normalizedTier) return null;
+  const tiers = tierConfigFromEnv(env);
+  const tier = tiers[normalizedTier];
+  if (!tier) return null;
+  const priceEur = Number(tier.priceEur);
+  const storageLimit = Math.round(Number(tier.storageLimit));
+  if (!Number.isFinite(priceEur) || priceEur < 0 || !Number.isFinite(storageLimit)) return null;
+  return { name: normalizedTier, priceEur, storageLimit };
+}
+
+async function fetchCryptoRateEur(currency) {
+  const coinIdMap = { BTC: 'bitcoin', LTC: 'litecoin' };
+  const coinId = coinIdMap[currency] || '';
+  if (!coinId) throw new Error('Unsupported rate lookup currency');
+  const now = Date.now();
+  const cached = RATE_CACHE.get(coinId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const rateData = await fetchJsonFromApi(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur`,
+    'Failed to fetch exchange rate'
+  );
+  const eurRate = Number(rateData?.[coinId]?.eur);
+  if (!Number.isFinite(eurRate) || eurRate <= 0) throw new Error('Invalid exchange rate response');
+  RATE_CACHE.set(coinId, { value: eurRate, expiresAt: now + RATE_CACHE_TTL_MS });
+  return eurRate;
+}
+
+function btcAmountToCoin(amountInSmallestUnit) {
+  return Number(amountInSmallestUnit || 0) / 10 ** CRYPTO_DECIMALS;
+}
+
+function getBtcReceivedAmount(txData, walletAddress) {
+  const outputs = Array.isArray(txData?.vout) ? txData.vout : [];
+  const normalizedWalletAddress = String(walletAddress || '').toLowerCase();
+  return outputs.reduce((sum, output) => {
+    if (String(output?.scriptpubkey_address || '').toLowerCase() !== normalizedWalletAddress) return sum;
+    return sum + btcAmountToCoin(output?.value);
+  }, 0);
+}
+
+function getLtcReceivedAmount(txData, transactionHash, walletAddress) {
+  const tx = txData?.data?.[transactionHash] || {};
+  const outputs = Array.isArray(tx.outputs) ? tx.outputs : [];
+  return outputs.reduce((sum, output) => {
+    if (String(output?.recipient || '').toLowerCase() !== String(walletAddress).toLowerCase()) return sum;
+    return sum + btcAmountToCoin(output?.value);
+  }, 0);
+}
+
+async function fetchReceivedAmount(currency, transactionHash, walletAddress) {
+  if (currency === 'BTC') {
+    const txData = await fetchJsonFromApi(`https://mempool.space/api/tx/${enc(transactionHash)}`, 'Unable to fetch BTC transaction');
+    return getBtcReceivedAmount(txData, walletAddress);
+  }
+  if (currency === 'LTC') {
+    const txData = await fetchJsonFromApi(
+      `https://blockchair.com/litecoin/dashboards/transaction/${enc(transactionHash)}`,
+      'Unable to fetch LTC transaction'
+    );
+    return getLtcReceivedAmount(txData, transactionHash, walletAddress);
+  }
+  throw new Error('Unsupported currency');
+}
+
+async function ensurePaymentNotProcessed(env, transactionHash) {
+  const existing = await sbGet(env, `payments?transaction_hash=eq.${enc(transactionHash)}&select=id,status,transaction_hash`);
+  if (existing.length) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
+  return null;
+}
+
+async function claimPayment(env, payload) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/payments?on_conflict=transaction_hash`, {
+    method: 'POST',
+    headers: { ...sbHeaders(env), Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const rows = await res.json().catch(() => []);
+  return rows[0] || null;
+}
+
+async function fetchJsonFromApi(url, defaultErrorMessage) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= EXTERNAL_API_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_API_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        const errorBody = (await response.text().catch(() => '')).slice(0, EXTERNAL_ERROR_BODY_MAX_LENGTH);
+        throw new Error(`${defaultErrorMessage}: HTTP ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ''}`);
+      }
+      const data = await response.json().catch(() => null);
+      if (!data) throw new Error(`${defaultErrorMessage}: empty or malformed JSON response from external API`);
+      return data;
+    } catch (err) {
+      lastError = err;
+      if (attempt === EXTERNAL_API_RETRIES) throw new Error(lastError?.message || defaultErrorMessage);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw new Error(lastError?.message || defaultErrorMessage);
+}
+
+async function verifyPayment(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  const tierName = String(body.tierName || '').trim();
+  const currency = normalizePaymentCurrency(body.currency);
+  const transactionHash = normalizeTransactionHash(body.transactionHash);
+  if (!userId || !tierName || !currency || !transactionHash) {
+    return jsonError('userId, tierName, currency, and transactionHash are required', 400, 'missing_payment_fields');
+  }
+  if (auth.userId !== userId) return jsonError('Forbidden', 403, 'forbidden');
+
+  const duplicateError = await ensurePaymentNotProcessed(env, transactionHash);
+  if (duplicateError) return duplicateError;
+
+  const tier = resolveTierConfig(env, tierName);
+  if (!tier) return jsonError('Unknown tierName or invalid tier config', 400, 'invalid_tier');
+  const claimed = await claimPayment(env, {
+    user_id: userId,
+    tier_name: tier.name,
+    currency,
+    transaction_hash: transactionHash,
+    status: 'processing',
+  });
+  if (!claimed) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
+
+  // ===== TEST MODE BYPASS (REMOVE BEFORE GOING LIVE) =====
+  if (isTestModeBypassHash(transactionHash, env)) {
+    const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+    if (!updatedProfile.length) {
+      await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
+      return jsonError('Profile not found', 404, 'profile_not_found');
+    }
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
+      status: 'used_test_bypass_remove_before_live',
+      status_reason: 'remove_before_live',
+      wallet_address: 'TEST_MODE_BYPASS_REMOVE_BEFORE_LIVE',
+    });
+    return jsonOk({
+      verified: true,
+      testModeBypass: true,
+      currency,
+      tierName: tier.name,
+      storageLimit: tier.storageLimit,
+      transactionHash,
+    });
+  }
+  // ===== END TEST MODE BYPASS =====
+
+  if (currency === 'XMR') {
+    await sbPost(env, 'manual_verifications', {
+      user_id: userId,
+      tier_name: tier.name,
+      currency,
+      transaction_hash: transactionHash,
+      status: 'Pending',
+      wallet_address: PAYMENT_WALLETS.XMR,
+    });
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
+      status: 'pending_manual',
+      wallet_address: PAYMENT_WALLETS.XMR,
+    });
+    return jsonOk({ status: 'pending', manualReview: true });
+  }
+
+  const walletAddress = PAYMENT_WALLETS[currency];
+  const receivedAmount = await fetchReceivedAmount(currency, transactionHash, walletAddress);
+  const eurRate = await fetchCryptoRateEur(currency);
+  const requiredAmount = tier.priceEur / eurRate;
+  if (receivedAmount + PAYMENT_TOLERANCE < requiredAmount) {
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'rejected_insufficient_amount' });
+    return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
+  }
+
+  const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+  if (!updatedProfile.length) {
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
+    return jsonError('Profile not found', 404, 'profile_not_found');
+  }
+
+  const receivedAmountUnits = Math.round(receivedAmount * 10 ** CRYPTO_DECIMALS);
+  const requiredAmountUnits = Math.round(requiredAmount * 10 ** CRYPTO_DECIMALS);
+  await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
+    wallet_address: walletAddress,
+    amount_received_units: receivedAmountUnits,
+    amount_required_units: requiredAmountUnits,
+    amount_received: Number(receivedAmount.toFixed(CRYPTO_DECIMALS)),
+    amount_required: Number(requiredAmount.toFixed(CRYPTO_DECIMALS)),
+    status: 'used',
+  });
+
+  return jsonOk({
+    verified: true,
+    currency,
+    tierName: tier.name,
+    storageLimit: tier.storageLimit,
+    transactionHash,
+  });
+}
+
 async function uploadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
@@ -978,6 +1229,12 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
+  normalizePaymentCurrency,
+  normalizeTransactionHash,
+  isTestModeBypassHash,
+  resolveTierConfig,
+  getBtcReceivedAmount,
+  getLtcReceivedAmount,
   isPreviewableMediaFile,
   guessPreviewContentType,
   isPreviewContentType,
