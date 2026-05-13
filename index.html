@@ -43,7 +43,8 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             text-align: center;
-            padding: 10px 15px; /* Better padding for mobile wrap */
+            padding: 10px 15px;
+            /* Better padding for mobile wrap */
         }
 
         /* --- NAVIGATION --- */
@@ -151,7 +152,8 @@
         }
 
         section {
-            min-height: 80vh; /* Reduced for mobile flow */
+            min-height: 80vh;
+            /* Reduced for mobile flow */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -162,9 +164,11 @@
 
         /* --- HERO --- */
         h1 {
-            font-size: clamp(4rem, 25vw, 10rem); /* Better scaling */
+            font-size: clamp(4rem, 25vw, 10rem);
+            /* Better scaling */
             margin: 0;
-            letter-spacing: -2px; /* Less aggressive for small screens */
+            letter-spacing: -2px;
+            /* Less aggressive for small screens */
             font-weight: 900;
             color: var(--text-main);
             line-height: 0.85;
@@ -174,7 +178,8 @@
         .hero-sub {
             font-size: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 4px; /* Reduced for small screens */
+            letter-spacing: 4px;
+            /* Reduced for small screens */
             color: var(--accent);
             margin-bottom: 20px;
             font-weight: 800;
@@ -182,7 +187,8 @@
         }
 
         .ark-shape {
-            width: 250px; /* Smaller for mobile */
+            width: 250px;
+            /* Smaller for mobile */
             height: 250px;
             border: 15px solid var(--text-main);
             position: absolute;
@@ -193,8 +199,13 @@
         }
 
         @keyframes drift {
-            from { transform: rotate(45deg) scale(1); }
-            to { transform: rotate(52deg) scale(1.1); }
+            from {
+                transform: rotate(45deg) scale(1);
+            }
+
+            to {
+                transform: rotate(52deg) scale(1.1);
+            }
         }
 
         /* --- STATS BAR --- */
@@ -204,7 +215,8 @@
             width: 100%;
             padding: 60px 8%;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Tighter grid for mobile */
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            /* Tighter grid for mobile */
             gap: 30px;
         }
 
@@ -260,10 +272,10 @@
 
         /* --- TECH SECTION --- */
         .tech-grid {
-            max-width: 1200px; 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-            gap: 40px; 
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
             align-items: center;
         }
 
@@ -284,8 +296,16 @@
             display: inline-block;
         }
 
-        .card:hover .btn { background: var(--accent); }
-        .btn.disabled, .btn.current { background: #f0f0f0; color: #aaa; pointer-events: none; }
+        .card:hover .btn {
+            background: var(--accent);
+        }
+
+        .btn.disabled,
+        .btn.current {
+            background: #f0f0f0;
+            color: #aaa;
+            pointer-events: none;
+        }
 
         footer {
             padding: 60px 8%;
@@ -296,25 +316,47 @@
 
         /* --- MOBILE OVERRIDES --- */
         @media (max-width: 768px) {
-            nav { padding: 15px 5%; }
-            .menu-toggle { display: flex; }
-            .nav-cta-desktop { display: none; }
-            
-            section { padding: 60px 5%; }
-            
+            nav {
+                padding: 15px 5%;
+            }
+
+            .menu-toggle {
+                display: flex;
+            }
+
+            .nav-cta-desktop {
+                display: none;
+            }
+
+            section {
+                padding: 60px 5%;
+            }
+
             .hero-btns {
                 flex-direction: column;
                 width: 100%;
             }
-            .hero-btns .btn { width: 100%; }
 
-            .tech-grid { 
+            .hero-btns .btn {
+                width: 100%;
+            }
+
+            .tech-grid {
                 grid-template-columns: 1fr;
                 text-align: center;
             }
-            .tech-grid .accent-line { margin: 0 auto 25px auto !important; }
-            .tech-grid h2 { font-size: 2.2rem !important; }
-            .tech-grid .tech-icon-box { padding: 40px !important; }
+
+            .tech-grid .accent-line {
+                margin: 0 auto 25px auto !important;
+            }
+
+            .tech-grid h2 {
+                font-size: 2.2rem !important;
+            }
+
+            .tech-grid .tech-icon-box {
+                padding: 40px !important;
+            }
         }
 
         @media (max-width: 480px) {
@@ -423,29 +465,71 @@
     <section id="plans">
         <div class="hero-sub">The Payload Tiers</div>
         <h2 style="font-size: 2.2rem; font-weight: 900; margin: 0; letter-spacing: -1px; text-transform: uppercase; text-align: center;">Select Your Capacity</h2>
+
+        <!-- PRIVACY BADGE -->
+        <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px; color: var(--text-sub); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            <i class="fab fa-bitcoin" style="color: var(--accent);"></i> Privacy Guaranteed: We accept BTC, ETH, and XMR
+        </div>
+
         <div class="price-container">
+            <!-- STARTER TIER -->
             <div class="card">
-                <div style="font-weight: 800;">Starter</div>
-                <div style="font-size: 1.5rem; margin: 20px 0;">Active</div>
+                <div style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Starter</div>
+                <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€0.00<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
                 <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">50GB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
                     <li style="margin-bottom: 15px;"><i class="fas fa-user-shield" style="color: var(--accent); margin-right: 12px;"></i> Privacy-First Policy</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-bolt-lightning" style="color: var(--accent); margin-right: 12px;"></i> Standard Retrieval</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-box" style="color: var(--accent); margin-right: 12px;"></i> 2GB Max Payload</li>
                 </ul>
-                <a href="#" class="btn current">Default Slot</a>
+                <a href="#" class="btn current">Active Slot</a>
             </div>
 
+            <!-- VAULT TIER -->
             <div class="card">
-                <div style="font-weight: 800;">Pro</div>
-                <div style="font-size: 1.5rem; margin: 20px 0; opacity: 0.5;">Locked</div>
-                <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">250GB Archive</div>
+                <div style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Vault</div>
+                <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€2.50<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
+                <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">500GB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
-                    <li style="margin-bottom: 15px;"><i class="fas fa-gauge-high" style="color: var(--accent); margin-right: 12px;"></i> High-Speed Priority</li>
-                    <li style="margin-bottom: 15px;"><i class="fas fa-key" style="color: var(--accent); margin-right: 12px;"></i> Dedicated API</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-infinity" style="color: var(--accent); margin-right: 12px;"></i> Zero Egress Fees</li>
+                    <!-- FIXED ICON BELOW -->
+                    <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-clock" style="color: var(--accent); margin-right: 12px;"></i> 1-3 Min Retrieval</li>
                 </ul>
-                <a href="#" class="btn disabled">Locked</a>
+                <a href="#" class="btn">Deploy Vault</a>
+            </div>
+
+            <!-- MONOLITH TIER -->
+            <div class="card" style="border-top-color: var(--accent);">
+                <div style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Monolith</div>
+                <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€9.00<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
+                <div style="font-size: 0.85rem; font-weight: 800; background: var(--accent); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">2TB Archive</div>
+                <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
+                    <li style="margin-bottom: 15px;"><i class="fas fa-gauge-high" style="color: var(--accent); margin-right: 12px;"></i> Priority Bandwidth</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-layer-group" style="color: var(--accent); margin-right: 12px;"></i> Creator Slot Status</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-code" style="color: var(--accent); margin-right: 12px;"></i> Full API Access</li>
+                </ul>
+                <a href="#" class="btn" style="background: var(--accent);">Deploy Monolith</a>
+            </div>
+
+            <!-- COLOSSUS TIER -->
+            <div class="card">
+                <div style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Colossus</div>
+                <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€35.00<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
+                <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">10TB Archive</div>
+                <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
+                    <li style="margin-bottom: 15px;"><i class="fas fa-server" style="color: var(--accent); margin-right: 12px;"></i> Global Node Distro</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-microchip" style="color: var(--accent); margin-right: 12px;"></i> Priority Reassembly</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-link-slash" style="color: var(--accent); margin-right: 12px;"></i> Anonymous Payment</li>
+                </ul>
+                <a href="#" class="btn">Deploy Colossus</a>
             </div>
         </div>
+
+        <!-- COMPLIANCE NOTE -->
+        <p style="text-align: center; color: var(--text-sub); font-size: 0.7rem; margin-top: 40px; opacity: 0.6; max-width: 600px; margin-left: auto; margin-right: auto;">
+            ARK is a European body. We do not track, index, or sell user metadata. All payments are processed via secure cryptocurrency gateways to ensure zero financial footprint.
+        </p>
     </section>
 
     <footer>
@@ -464,4 +548,5 @@
     </script>
 
 </body>
+
 </html>
