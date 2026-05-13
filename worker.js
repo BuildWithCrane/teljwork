@@ -271,6 +271,7 @@ function serveAdminPage() {
     let users = [];
 
     const GB = 1073741824;
+    const LOAD_USERS_TIMEOUT_MS = 15000;
     const UNLIMITED_STORAGE_ALIASES = ['unlimited', '∞', 'inf', 'infinite'];
     const isUnlimitedStorage = (bytes) => Number(bytes) < 0;
     function formatStorage(bytes) {
@@ -415,7 +416,7 @@ function serveAdminPage() {
 
     async function loadUsers() {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeout = setTimeout(() => controller.abort(), LOAD_USERS_TIMEOUT_MS);
       try {
         const res = await fetch('/admin/users', {
           headers: { Authorization: 'Bearer ' + adminPassword },
@@ -430,7 +431,7 @@ function serveAdminPage() {
         users = [];
         renderUsers();
         let message = 'Failed to load users';
-        if (err?.name === 'AbortError') {
+        if (err instanceof DOMException && err.name === 'AbortError') {
           message = 'Request timed out while loading users.';
         } else if (err instanceof Error && err.message) {
           message = err.message;
