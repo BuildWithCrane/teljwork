@@ -283,7 +283,7 @@ function serveAdminPage() {
       if (n >= 1024) return (n / 1024).toFixed(2) + ' KB';
       return n.toFixed(0) + ' B';
     }
-    const esc = (v) => String(v || '').replace(/[&<>"'\`]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\`':'&#96;' }[ch]));
+    const esc = (v) => String(v || '').replace(/[&<>"'\u0060]/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '\u0060':'&#96;' }[ch]));
 
     function setStatus(message, type = 'muted') {
       const el = document.getElementById('status');
@@ -363,7 +363,7 @@ function serveAdminPage() {
         btn.addEventListener('click', async () => {
           const userId = btn.getAttribute('data-purge');
           const email = btn.getAttribute('data-email') || userId;
-          if (!confirm('Purge ALL files for ' + email + '?\n\nThis will delete every file from storage. The account will remain. This cannot be undone.')) return;
+          if (!confirm('Purge ALL files for ' + email + '?\\n\\nThis will delete every file from storage. The account will remain. This cannot be undone.')) return;
           btn.disabled = true;
           try {
             const res = await fetch('/admin/users/purge-files', {
@@ -390,7 +390,7 @@ function serveAdminPage() {
         btn.addEventListener('click', async () => {
           const userId = btn.getAttribute('data-delete');
           const email = btn.getAttribute('data-email') || userId;
-          if (!confirm('Permanently delete account for ' + email + '?\n\nThis will delete all files AND the account. This cannot be undone.')) return;
+          if (!confirm('Permanently delete account for ' + email + '?\\n\\nThis will delete all files AND the account. This cannot be undone.')) return;
           btn.disabled = true;
           try {
             const res = await fetch('/admin/users/delete', {
