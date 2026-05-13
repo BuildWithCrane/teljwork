@@ -18,6 +18,7 @@ const EXTERNAL_API_TIMEOUT_MS = 15000;
 const EXTERNAL_API_RETRIES = 1;
 const RATE_CACHE_TTL_MS = 60000;
 const RATE_CACHE = new Map();
+const EXTERNAL_ERROR_BODY_MAX_LENGTH = 240;
 const TEST_MODE_BYPASS_HASH = 'ARK_TEST_BYPASS'; // REMOVE BEFORE GOING LIVE
 const PAYMENT_WALLETS = {
   BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
@@ -686,8 +687,9 @@ function normalizeTransactionHash(transactionHash) {
   return String(transactionHash || '').trim();
 }
 
-function isTestModeBypassHash(transactionHash) {
-  return String(transactionHash || '').trim() === TEST_MODE_BYPASS_HASH;
+function isTestModeBypassHash(transactionHash, env) {
+  const enabled = String(env?.ENABLE_TEST_MODE || '').toLowerCase() === 'true'; // REMOVE BEFORE GOING LIVE
+  return enabled && String(transactionHash || '').trim() === TEST_MODE_BYPASS_HASH;
 }
 
 function tierConfigFromEnv(env) {
@@ -789,7 +791,7 @@ async function fetchJsonFromApi(url, defaultErrorMessage) {
     try {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) {
-        const errorBody = (await response.text().catch(() => '')).slice(0, 240);
+        const errorBody = (await response.text().catch(() => '')).slice(0, EXTERNAL_ERROR_BODY_MAX_LENGTH);
         throw new Error(`${defaultErrorMessage}: HTTP ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ''}`);
       }
       const data = await response.json().catch(() => null);
@@ -834,7 +836,7 @@ async function verifyPayment(request, env) {
   if (!claimed) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
 
   // ===== TEST MODE BYPASS (REMOVE BEFORE GOING LIVE) =====
-  if (isTestModeBypassHash(transactionHash)) {
+  if (isTestModeBypassHash(transactionHash, env)) {
     const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
     if (!updatedProfile.length) {
       await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
@@ -842,6 +844,7 @@ async function verifyPayment(request, env) {
     }
     await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
       status: 'used_test_bypass_remove_before_live',
+      status_reason: 'REMOVE_BEFORE_GO_LIVE',
       wallet_address: 'TEST_MODE_BYPASS_REMOVE_BEFORE_LIVE',
     });
     return jsonOk({

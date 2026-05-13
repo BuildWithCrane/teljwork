@@ -54,8 +54,9 @@ test('payment helpers normalize currency and hash input', () => {
   assert.equal(__testables.normalizePaymentCurrency(' btc '), 'BTC');
   assert.equal(__testables.normalizePaymentCurrency('doge'), '');
   assert.equal(__testables.normalizeTransactionHash('  abc123  '), 'abc123');
-  assert.equal(__testables.isTestModeBypassHash('ARK_TEST_BYPASS'), true);
-  assert.equal(__testables.isTestModeBypassHash('ark_test_bypass'), false);
+  assert.equal(__testables.isTestModeBypassHash('ARK_TEST_BYPASS', { ENABLE_TEST_MODE: 'true' }), true);
+  assert.equal(__testables.isTestModeBypassHash('ARK_TEST_BYPASS', { ENABLE_TEST_MODE: 'false' }), false);
+  assert.equal(__testables.isTestModeBypassHash('ark_test_bypass', { ENABLE_TEST_MODE: 'true' }), false);
 });
 
 test('resolveTierConfig uses defaults and validates unknown tiers', () => {
