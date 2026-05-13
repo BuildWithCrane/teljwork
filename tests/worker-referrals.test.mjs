@@ -49,3 +49,53 @@ test('isPreviewContentType allows only image and video mime types', () => {
   assert.equal(__testables.isPreviewContentType('application/octet-stream'), false);
   assert.equal(__testables.isPreviewContentType('application/pdf'), false);
 });
+
+test('payment helpers normalize currency and hash input', () => {
+  assert.equal(__testables.normalizePaymentCurrency(' btc '), 'BTC');
+  assert.equal(__testables.normalizePaymentCurrency('doge'), '');
+  assert.equal(__testables.normalizeTransactionHash('  abc123  '), 'abc123');
+});
+
+test('resolveTierConfig uses defaults and validates unknown tiers', () => {
+  const pro = __testables.resolveTierConfig({}, 'Pro');
+  assert.equal(pro.name, 'pro');
+  assert.equal(pro.priceEur, 1.99);
+  assert.equal(pro.storageLimit, 250 * 1073741824);
+  assert.equal(__testables.resolveTierConfig({}, 'unknown'), null);
+});
+
+test('resolveTierConfig supports PAYMENT_TIER_CONFIG overrides', () => {
+  const env = {
+    PAYMENT_TIER_CONFIG: JSON.stringify({
+      gold: { priceEur: 7.5, storageLimit: 777 },
+    }),
+  };
+  const gold = __testables.resolveTierConfig(env, 'gold');
+  assert.deepEqual(gold, { name: 'gold', priceEur: 7.5, storageLimit: 777 });
+});
+
+test('BTC and LTC amount helpers sum outputs to configured wallet', () => {
+  const btcWallet = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
+  const ltcWallet = 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr';
+  const btcAmount = __testables.getBtcReceivedAmount({
+    vout: [
+      { scriptpubkey_address: btcWallet, value: 120000 },
+      { scriptpubkey_address: btcWallet, value: 30000 },
+      { scriptpubkey_address: 'bc1qother', value: 50000 },
+    ],
+  }, btcWallet);
+  assert.equal(btcAmount, 0.0015);
+
+  const ltcAmount = __testables.getLtcReceivedAmount({
+    data: {
+      hash123: {
+        outputs: [
+          { recipient: ltcWallet, value: 1000000 },
+          { recipient: ltcWallet.toUpperCase(), value: 2000000 },
+          { recipient: 'ltc1qother', value: 3000000 },
+        ],
+      },
+    },
+  }, 'hash123', ltcWallet);
+  assert.equal(ltcAmount, 0.03);
+});

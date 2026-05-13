@@ -12,6 +12,18 @@ const BASE_STORAGE = 50 * GB;
 const FILE_LIMIT = 2000 * 1024 * 1024; // 2GB (Telegram MTProto limit via bridge)
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
+const CRYPTO_DECIMALS = 8;
+const PAYMENT_WALLETS = {
+  BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
+  LTC: 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr',
+  XMR: '4254cXFs8vLXCEVm1T7TDAdovjqMiNZX8aym8DiMM2EiUVbDnhRQt6uauFyTeP2pkqXtcodDWPoPg1nrQNsz8xuqP3q3rrQ',
+};
+const DEFAULT_TIER_CONFIG = {
+  starter: { priceEur: 0, storageLimit: 50 * GB },
+  pro: { priceEur: 1.99, storageLimit: 250 * GB },
+  creator: { priceEur: 4.99, storageLimit: 1024 * GB },
+  studio: { priceEur: 14.99, storageLimit: 5 * 1024 * GB },
+};
 
 export default {
   async fetch(request, env) {
@@ -27,6 +39,7 @@ export default {
       if (pathname === '/auth/register' && request.method === 'POST') return register(request, env);
       if (pathname === '/auth/login' && request.method === 'POST') return login(request, env);
       if (pathname === '/auth/me' && request.method === 'GET') return getMe(request, env);
+      if (pathname === '/verify-payment' && request.method === 'POST') return verifyPayment(request, env);
 
       if (pathname === '/files/upload' && request.method === 'POST') return uploadFile(request, env);
       if (pathname === '/files' && request.method === 'GET') return listFiles(request, env);
@@ -658,6 +671,158 @@ async function getMe(request, env) {
   return users.length ? jsonOk(users[0]) : jsonError('User not found', 404, 'user_not_found');
 }
 
+function normalizePaymentCurrency(currency) {
+  const value = String(currency || '').trim().toUpperCase();
+  return ['BTC', 'LTC', 'XMR'].includes(value) ? value : '';
+}
+
+function normalizeTransactionHash(transactionHash) {
+  return String(transactionHash || '').trim();
+}
+
+function tierConfigFromEnv(env) {
+  const raw = String(env.PAYMENT_TIER_CONFIG || '').trim();
+  if (!raw) return DEFAULT_TIER_CONFIG;
+  const parsed = safeJson(raw);
+  return parsed && typeof parsed === 'object' ? parsed : DEFAULT_TIER_CONFIG;
+}
+
+function resolveTierConfig(env, tierName) {
+  const normalizedTier = String(tierName || '').trim().toLowerCase();
+  if (!normalizedTier) return null;
+  const tiers = tierConfigFromEnv(env);
+  const tier = tiers[normalizedTier];
+  if (!tier) return null;
+  const priceEur = Number(tier.priceEur);
+  const storageLimit = Math.round(Number(tier.storageLimit));
+  if (!Number.isFinite(priceEur) || priceEur < 0 || !Number.isFinite(storageLimit)) return null;
+  return { name: normalizedTier, priceEur, storageLimit };
+}
+
+async function fetchCryptoRateEur(currency) {
+  const coinId = currency === 'BTC' ? 'bitcoin' : (currency === 'LTC' ? 'litecoin' : '');
+  if (!coinId) throw new Error('Unsupported rate lookup currency');
+  const rateRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=eur`);
+  if (!rateRes.ok) throw new Error('Failed to fetch exchange rate');
+  const rateData = await rateRes.json().catch(() => ({}));
+  const eurRate = Number(rateData?.[coinId]?.eur);
+  if (!Number.isFinite(eurRate) || eurRate <= 0) throw new Error('Invalid exchange rate response');
+  return eurRate;
+}
+
+function btcAmountToCoin(amountInSmallestUnit) {
+  return Number(amountInSmallestUnit || 0) / 10 ** CRYPTO_DECIMALS;
+}
+
+function getBtcReceivedAmount(txData, walletAddress) {
+  const outputs = Array.isArray(txData?.vout) ? txData.vout : [];
+  return outputs.reduce((sum, output) => {
+    if (String(output?.scriptpubkey_address || '') !== walletAddress) return sum;
+    return sum + btcAmountToCoin(output?.value);
+  }, 0);
+}
+
+function getLtcReceivedAmount(txData, transactionHash, walletAddress) {
+  const tx = txData?.data?.[transactionHash] || {};
+  const outputs = Array.isArray(tx.outputs) ? tx.outputs : [];
+  return outputs.reduce((sum, output) => {
+    if (String(output?.recipient || '').toLowerCase() !== String(walletAddress).toLowerCase()) return sum;
+    return sum + btcAmountToCoin(output?.value);
+  }, 0);
+}
+
+async function fetchReceivedAmount(currency, transactionHash, walletAddress) {
+  if (currency === 'BTC') {
+    const txRes = await fetch(`https://mempool.space/api/tx/${enc(transactionHash)}`);
+    if (!txRes.ok) throw new Error('Unable to fetch BTC transaction');
+    const txData = await txRes.json().catch(() => ({}));
+    return getBtcReceivedAmount(txData, walletAddress);
+  }
+  if (currency === 'LTC') {
+    const txRes = await fetch(`https://blockchair.com/litecoin/dashboards/transaction/${enc(transactionHash)}`);
+    if (!txRes.ok) throw new Error('Unable to fetch LTC transaction');
+    const txData = await txRes.json().catch(() => ({}));
+    return getLtcReceivedAmount(txData, transactionHash, walletAddress);
+  }
+  throw new Error('Unsupported currency');
+}
+
+async function ensurePaymentNotProcessed(env, transactionHash) {
+  const existing = await sbGet(env, `payments?transaction_hash=eq.${enc(transactionHash)}&select=id,status,transaction_hash`);
+  if (existing.length) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
+  return null;
+}
+
+async function recordPayment(env, payload) {
+  await sbPost(env, 'payments', payload);
+}
+
+async function verifyPayment(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  const tierName = String(body.tierName || '').trim();
+  const currency = normalizePaymentCurrency(body.currency);
+  const transactionHash = normalizeTransactionHash(body.transactionHash);
+  if (!userId || !tierName || !currency || !transactionHash) {
+    return jsonError('userId, tierName, currency, and transactionHash are required', 400, 'missing_payment_fields');
+  }
+
+  const duplicateError = await ensurePaymentNotProcessed(env, transactionHash);
+  if (duplicateError) return duplicateError;
+
+  const tier = resolveTierConfig(env, tierName);
+  if (!tier) return jsonError('Unknown tierName or invalid tier config', 400, 'invalid_tier');
+
+  if (currency === 'XMR') {
+    await sbPost(env, 'manual_verifications', {
+      user_id: userId,
+      tier_name: tier.name,
+      currency,
+      transaction_hash: transactionHash,
+      status: 'Pending',
+      wallet_address: PAYMENT_WALLETS.XMR,
+    });
+    await recordPayment(env, {
+      user_id: userId,
+      tier_name: tier.name,
+      currency,
+      transaction_hash: transactionHash,
+      status: 'pending_manual',
+    });
+    return jsonOk({ status: 'Pending', manualReview: true });
+  }
+
+  const walletAddress = PAYMENT_WALLETS[currency];
+  const receivedAmount = await fetchReceivedAmount(currency, transactionHash, walletAddress);
+  const eurRate = await fetchCryptoRateEur(currency);
+  const requiredAmount = tier.priceEur / eurRate;
+  if (!(receivedAmount + (1 / 10 ** CRYPTO_DECIMALS) >= requiredAmount)) {
+    return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
+  }
+
+  const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+  if (!updatedProfile.length) return jsonError('Profile not found', 404, 'profile_not_found');
+
+  await recordPayment(env, {
+    user_id: userId,
+    tier_name: tier.name,
+    currency,
+    transaction_hash: transactionHash,
+    wallet_address: walletAddress,
+    amount_received: Number(receivedAmount.toFixed(CRYPTO_DECIMALS)),
+    amount_required: Number(requiredAmount.toFixed(CRYPTO_DECIMALS)),
+    status: 'used',
+  });
+
+  return jsonOk({
+    verified: true,
+    currency,
+    tierName: tier.name,
+    storageLimit: tier.storageLimit,
+    transactionHash,
+  });
+}
+
 async function uploadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
@@ -978,6 +1143,11 @@ export const __testables = {
   safeJson,
   parseStorageCapBytes,
   safeEqual,
+  normalizePaymentCurrency,
+  normalizeTransactionHash,
+  resolveTierConfig,
+  getBtcReceivedAmount,
+  getLtcReceivedAmount,
   isPreviewableMediaFile,
   guessPreviewContentType,
   isPreviewContentType,
