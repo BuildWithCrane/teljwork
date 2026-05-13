@@ -429,9 +429,12 @@ function serveAdminPage() {
       } catch (err) {
         users = [];
         renderUsers();
-        const message = (err?.name === 'AbortError')
-          ? 'Request timed out while loading users.'
-          : (err instanceof Error ? err.message : 'Failed to load users');
+        let message = 'Failed to load users';
+        if (err?.name === 'AbortError') {
+          message = 'Request timed out while loading users.';
+        } else if (err instanceof Error && err.message) {
+          message = err.message;
+        }
         setStatus(message, 'error');
       } finally {
         clearTimeout(timeout);
@@ -441,7 +444,7 @@ function serveAdminPage() {
     const loadBtn = document.getElementById('load');
     const passwordInput = document.getElementById('password');
     async function handleLoadClick() {
-      adminPassword = String(passwordInput.value || '').trim();
+      adminPassword = passwordInput.value.trim();
       if (!adminPassword) {
         setStatus('Enter admin password first.', 'error');
         return;
