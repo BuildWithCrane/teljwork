@@ -4,6 +4,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Password',
 };
+const ALLOWED_CORS_ORIGINS = new Set(['https://ark.dockl.com', 'https://www.ark.dockl.com']);
 
 const GB = 1073741824;
 const UNLIMITED_STORAGE_CAP = -1;
@@ -34,32 +35,56 @@ const DEFAULT_TIER_CONFIG = {
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeadersFor(request) });
     const { pathname } = new URL(request.url);
+    const withCors = (response) => applyCorsHeaders(request, response);
     try {
-      if (pathname === '/admin' && request.method === 'GET') return serveAdminPage();
-      if (pathname === '/admin/users' && request.method === 'GET') return listAdminUsers(request, env);
-      if (pathname === '/admin/users/storage-limit' && request.method === 'POST') return updateUserStorageLimit(request, env);
-      if (pathname === '/admin/users/delete' && request.method === 'POST') return adminDeleteUser(request, env);
-      if (pathname === '/admin/users/purge-files' && request.method === 'POST') return adminPurgeUserFiles(request, env);
+      if (pathname === '/admin' && request.method === 'GET') return withCors(await serveAdminPage());
+      if (pathname === '/admin/users' && request.method === 'GET') return withCors(await listAdminUsers(request, env));
+      if (pathname === '/admin/users/storage-limit' && request.method === 'POST') return withCors(await updateUserStorageLimit(request, env));
+      if (pathname === '/admin/users/delete' && request.method === 'POST') return withCors(await adminDeleteUser(request, env));
+      if (pathname === '/admin/users/purge-files' && request.method === 'POST') return withCors(await adminPurgeUserFiles(request, env));
 
-      if (pathname === '/auth/register' && request.method === 'POST') return register(request, env);
-      if (pathname === '/auth/login' && request.method === 'POST') return login(request, env);
-      if (pathname === '/auth/me' && request.method === 'GET') return getMe(request, env);
-      if (pathname === '/verify-payment' && request.method === 'POST') return verifyPayment(request, env);
+      if (pathname === '/auth/register' && request.method === 'POST') return withCors(await register(request, env));
+      if (pathname === '/auth/login' && request.method === 'POST') return withCors(await login(request, env));
+      if (pathname === '/auth/me' && request.method === 'GET') return withCors(await getMe(request, env));
+      if (pathname === '/verify-payment' && request.method === 'POST') return withCors(await verifyPayment(request, env));
 
-      if (pathname === '/files/upload' && request.method === 'POST') return uploadFile(request, env);
-      if (pathname === '/files' && request.method === 'GET') return listFiles(request, env);
-      if (pathname === '/files/download' && request.method === 'GET') return downloadFile(request, env);
-      if (pathname === '/files/view' && request.method === 'GET') return viewFile(request, env);
-      if (pathname === '/files/delete' && request.method === 'POST') return deleteFile(request, env);
+      if (pathname === '/files/upload' && request.method === 'POST') return withCors(await uploadFile(request, env));
+      if (pathname === '/files' && request.method === 'GET') return withCors(await listFiles(request, env));
+      if (pathname === '/files/download' && request.method === 'GET') return withCors(await downloadFile(request, env));
+      if (pathname === '/files/view' && request.method === 'GET') return withCors(await viewFile(request, env));
+      if (pathname === '/files/delete' && request.method === 'POST') return withCors(await deleteFile(request, env));
 
-      return jsonError('Not found', 404, 'not_found');
+      return withCors(jsonError('Not found', 404, 'not_found'));
     } catch (err) {
-      return jsonError(`Server error: ${err.message}`, 500, 'server_error');
+      return withCors(jsonError(`Server error: ${err.message}`, 500, 'server_error'));
     }
   }
 };
+
+function corsHeadersFor(request) {
+  const origin = request.headers.get('Origin');
+  const allowedOrigin = origin && ALLOWED_CORS_ORIGINS.has(origin) ? origin : CORS_HEADERS['Access-Control-Allow-Origin'];
+  return {
+    ...CORS_HEADERS,
+    'Access-Control-Allow-Origin': allowedOrigin,
+    Vary: 'Origin',
+  };
+}
+
+function applyCorsHeaders(request, response) {
+  const headers = new Headers(response.headers);
+  const cors = corsHeadersFor(request);
+  for (const [key, value] of Object.entries(cors)) {
+    headers.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 function serveAdminPage() {
   return new Response(`<!doctype html>
