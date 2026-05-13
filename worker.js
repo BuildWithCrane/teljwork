@@ -421,7 +421,7 @@ function serveAdminPage() {
           headers: { Authorization: 'Bearer ' + adminPassword },
           signal: controller.signal,
         });
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load users');
         users = Array.isArray(data.users) ? data.users : [];
         renderUsers();
@@ -429,9 +429,9 @@ function serveAdminPage() {
       } catch (err) {
         users = [];
         renderUsers();
-        const message = (err && err.name === 'AbortError')
+        const message = (err?.name === 'AbortError')
           ? 'Request timed out while loading users.'
-          : (err && err.message) || 'Failed to load users';
+          : (err instanceof Error ? err.message : 'Failed to load users');
         setStatus(message, 'error');
       } finally {
         clearTimeout(timeout);
