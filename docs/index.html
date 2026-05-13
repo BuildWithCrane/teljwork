@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Vault Guide | ARK Documentation</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Updated to Font Awesome 6 for better icon support -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
     
     <style>
@@ -176,6 +177,7 @@
             <div class="nav-group-title">Operations</div>
             <a href="#uploading" class="nav-link">Uploading Data</a>
             <a href="#retrieval" class="nav-link">Retrieval Process</a>
+            <a href="#billing" class="nav-link">Billing & Deployment</a>
             <a href="#limits" class="nav-link">Network Limits</a>
         </div>
 
@@ -233,6 +235,40 @@
             <div class="info-box">
                 <strong><i class="fas fa-clock"></i> Expected Latency:</strong> 
                 Standard retrieval usually completes within 1-3 minutes depending on payload size and network traffic. High-priority Pro and Creator slots receive bandwidth preference.
+            </div>
+        </section>
+
+        <section id="billing">
+            <h2>Billing & Deployment</h2>
+            <p>ARK operates on a circular crypto-economy. We do not accept fiat currency or traditional credit cards to ensure the financial privacy of our operators.</p>
+
+            <div class="step-card">
+                <div class="step-num">01</div>
+                <div>
+                    <strong>Select Your Tier</strong>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: var(--text-sub);">Choose between Vault (500GB) or Monolith (2TB) based on your archival requirements.</p>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-num">02</div>
+                <div>
+                    <strong>Transmit Crypto</strong>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: var(--text-sub);">Send the exact EUR equivalent in <strong>BTC</strong> or <strong>LTC</strong> to the provided address. For <strong>XMR</strong> payments, manual verification is required.</p>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-num">03</div>
+                <div>
+                    <strong>Submit Proof of Payment</strong>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: var(--text-sub);">Copy your <strong>Transaction Hash (ID)</strong> from your wallet and paste it into the activation terminal. Our network verifies the blockchain record and unlocks your storage instantly.</p>
+                </div>
+            </div>
+
+            <div class="info-box" style="background: #f4f4f4; border-left-color: var(--text-main);">
+                <strong><i class="fa-solid fa-shield-halved"></i> Privacy Note:</strong> 
+                Because we use the Transaction Hash as your receipt, ARK never requires your name, billing address, or banking details. Your storage is linked only to your Vault ID.
             </div>
         </section>
 
