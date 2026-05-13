@@ -84,7 +84,7 @@ test('BTC and LTC amount helpers sum outputs to configured wallet', () => {
       { scriptpubkey_address: 'bc1qother', value: 50000 },
     ],
   }, btcWallet);
-  assert.equal(btcAmount, 0.0015);
+  assert.ok(Math.abs(btcAmount - 0.0015) < 1e-12);
 
   const ltcAmount = __testables.getLtcReceivedAmount({
     data: {
@@ -97,5 +97,5 @@ test('BTC and LTC amount helpers sum outputs to configured wallet', () => {
       },
     },
   }, 'hash123', ltcWallet);
-  assert.equal(ltcAmount, 0.03);
+  assert.ok(Math.abs(ltcAmount - 0.03) < 1e-12);
 });
