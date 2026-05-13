@@ -13,7 +13,7 @@ const FILE_LIMIT = 2000 * 1024 * 1024; // 2GB (Telegram MTProto limit via bridge
 const JWT_EXPIRY_SECONDS = 86400 * 30;
 const PBKDF2_ITERATIONS = 100000;
 const CRYPTO_DECIMALS = 8;
-const MINIMUM_CRYPTO_UNIT = 1 / 10 ** CRYPTO_DECIMALS;
+const PAYMENT_TOLERANCE = 1 / 10 ** CRYPTO_DECIMALS;
 const EXTERNAL_API_TIMEOUT_MS = 15000;
 const EXTERNAL_API_RETRIES = 1;
 const RATE_CACHE_TTL_MS = 60000;
@@ -783,9 +783,12 @@ async function fetchJsonFromApi(url, defaultErrorMessage) {
     const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_API_TIMEOUT_MS);
     try {
       const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) throw new Error(`${defaultErrorMessage}: HTTP ${response.status}`);
+      if (!response.ok) {
+        const errorBody = (await response.text().catch(() => '')).slice(0, 240);
+        throw new Error(`${defaultErrorMessage}: HTTP ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ''}`);
+      }
       const data = await response.json().catch(() => null);
-      if (!data) throw new Error(`${defaultErrorMessage}: invalid JSON`);
+      if (!data) throw new Error(`${defaultErrorMessage}: empty or malformed JSON response from external API`);
       return data;
     } catch (err) {
       lastError = err;
@@ -838,14 +841,14 @@ async function verifyPayment(request, env) {
       status: 'pending_manual',
       wallet_address: PAYMENT_WALLETS.XMR,
     });
-    return jsonOk({ status: 'Pending', manualReview: true });
+    return jsonOk({ status: 'pending', manualReview: true });
   }
 
   const walletAddress = PAYMENT_WALLETS[currency];
   const receivedAmount = await fetchReceivedAmount(currency, transactionHash, walletAddress);
   const eurRate = await fetchCryptoRateEur(currency);
   const requiredAmount = tier.priceEur / eurRate;
-  if (receivedAmount + MINIMUM_CRYPTO_UNIT < requiredAmount) {
+  if (receivedAmount + PAYMENT_TOLERANCE < requiredAmount) {
     await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'rejected_insufficient_amount' });
     return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
   }
@@ -857,7 +860,7 @@ async function verifyPayment(request, env) {
   }
 
   const receivedAmountUnits = Math.round(receivedAmount * 10 ** CRYPTO_DECIMALS);
-  const requiredAmountUnits = Math.ceil(requiredAmount * 10 ** CRYPTO_DECIMALS);
+  const requiredAmountUnits = Math.round(requiredAmount * 10 ** CRYPTO_DECIMALS);
   await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
     wallet_address: walletAddress,
     amount_received_units: receivedAmountUnits,
