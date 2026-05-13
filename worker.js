@@ -18,6 +18,7 @@ const EXTERNAL_API_TIMEOUT_MS = 15000;
 const EXTERNAL_API_RETRIES = 1;
 const RATE_CACHE_TTL_MS = 60000;
 const RATE_CACHE = new Map();
+const TEST_MODE_BYPASS_HASH = 'ARK_TEST_BYPASS'; // REMOVE BEFORE GOING LIVE
 const PAYMENT_WALLETS = {
   BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
   LTC: 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr',
@@ -685,6 +686,10 @@ function normalizeTransactionHash(transactionHash) {
   return String(transactionHash || '').trim();
 }
 
+function isTestModeBypassHash(transactionHash) {
+  return String(transactionHash || '').trim() === TEST_MODE_BYPASS_HASH;
+}
+
 function tierConfigFromEnv(env) {
   const raw = String(env.PAYMENT_TIER_CONFIG || '').trim();
   if (!raw) return DEFAULT_TIER_CONFIG;
@@ -827,6 +832,28 @@ async function verifyPayment(request, env) {
     status: 'processing',
   });
   if (!claimed) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
+
+  // ===== TEST MODE BYPASS (REMOVE BEFORE GOING LIVE) =====
+  if (isTestModeBypassHash(transactionHash)) {
+    const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+    if (!updatedProfile.length) {
+      await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
+      return jsonError('Profile not found', 404, 'profile_not_found');
+    }
+    await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, {
+      status: 'used_test_bypass_remove_before_live',
+      wallet_address: 'TEST_MODE_BYPASS_REMOVE_BEFORE_LIVE',
+    });
+    return jsonOk({
+      verified: true,
+      testModeBypass: true,
+      currency,
+      tierName: tier.name,
+      storageLimit: tier.storageLimit,
+      transactionHash,
+    });
+  }
+  // ===== END TEST MODE BYPASS =====
 
   if (currency === 'XMR') {
     await sbPost(env, 'manual_verifications', {
@@ -1201,6 +1228,7 @@ export const __testables = {
   safeEqual,
   normalizePaymentCurrency,
   normalizeTransactionHash,
+  isTestModeBypassHash,
   resolveTierConfig,
   getBtcReceivedAmount,
   getLtcReceivedAmount,
