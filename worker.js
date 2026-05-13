@@ -430,8 +430,9 @@ function serveAdminPage() {
       } catch (err) {
         users = [];
         renderUsers();
+        const errName = err && typeof err === 'object' ? err.name : '';
         let message = 'Failed to load users';
-        if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') {
+        if (errName === 'AbortError') {
           message = 'Request timed out while loading users.';
         } else if (err instanceof Error && err.message) {
           message = err.message;
