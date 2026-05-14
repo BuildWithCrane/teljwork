@@ -714,14 +714,17 @@
         function setTierButtonState(button, isActive) {
             if (!button) return;
             if (!button.dataset.defaultLabel) button.dataset.defaultLabel = (button.textContent || '').trim();
+            if (!button.dataset.defaultHref) button.dataset.defaultHref = button.getAttribute('href') || '';
             button.textContent = isActive ? 'Active Slot' : button.dataset.defaultLabel;
             button.classList.toggle('current', isActive);
             if (isActive) {
                 button.setAttribute('aria-current', 'true');
+                button.removeAttribute('href');
             } else {
                 button.removeAttribute('aria-current');
+                if (button.dataset.defaultHref) button.setAttribute('href', button.dataset.defaultHref);
             }
-            button.tabIndex = isActive ? -1 : 0;
+            button.tabIndex = 0;
         }
 
         async function syncTierButtons() {
@@ -805,6 +808,7 @@
         async function handleBtcPayment(event) {
             event.preventDefault();
             const btn = event.currentTarget;
+            if (btn.classList.contains('current')) return;
             const tierName = String(btn.dataset.tier || '').trim();
             const planName = String(btn.dataset.plan || tierName || 'tier').trim();
             if (!tierName) return;
@@ -824,6 +828,7 @@
 
         function handleStarterDeployment(event) {
             event.preventDefault();
+            if (event.currentTarget.classList.contains('current')) return;
             const token = localStorage.getItem('jwork_token');
             window.location.href = token ? '/dash/' : '/auth/';
         }
