@@ -1036,7 +1036,7 @@ function getDailyBandwidthCapBytes(storageCapBytes) {
 }
 
 function consumeDailyBandwidth(userId, storageCapBytes, transferBytes) {
-  const bytes = Math.max(0, Math.round(Number(transferBytes) || 0));
+  const bytes = Math.max(0, Math.round(Number(transferBytes)));
   if (!bytes) return { allowed: true };
 
   const capBytes = getDailyBandwidthCapBytes(storageCapBytes);
