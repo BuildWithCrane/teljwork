@@ -20,6 +20,16 @@ const EXTERNAL_API_RETRIES = 1;
 const RATE_CACHE_TTL_MS = 60000;
 const RATE_CACHE = new Map();
 const EXTERNAL_ERROR_BODY_MAX_LENGTH = 240;
+const ADMIN_AUDIT_LOG_LIMIT = 300;
+const ADMIN_AUDIT_LOGS = [];
+const ADMIN_AUTH_ATTEMPTS = new Map();
+const ADMIN_LOCKOUTS = new Map();
+const ADMIN_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const ADMIN_MAX_FAILED_ATTEMPTS = 8;
+const ADMIN_LOCKOUT_MS = 20 * 60 * 1000;
+const SOFT_DISABLED_USERS = new Map();
+const SESSION_STORE = new Map();
+const REVOKED_SESSION_IDS = new Set();
 const DAILY_BANDWIDTH_LIMITS = {
   starter: 10 * GB,
   pro: 100 * GB,
@@ -51,10 +61,18 @@ export default {
       if (pathname === '/admin/users/storage-limit' && request.method === 'POST') return withCors(await updateUserStorageLimit(request, env));
       if (pathname === '/admin/users/delete' && request.method === 'POST') return withCors(await adminDeleteUser(request, env));
       if (pathname === '/admin/users/purge-files' && request.method === 'POST') return withCors(await adminPurgeUserFiles(request, env));
+      if (pathname === '/admin/users/disable' && request.method === 'POST') return withCors(await adminDisableUser(request, env));
+      if (pathname === '/admin/users/restore' && request.method === 'POST') return withCors(await adminRestoreUser(request, env));
+      if (pathname === '/admin/users/details' && request.method === 'GET') return withCors(await adminUserDetails(request, env));
+      if (pathname === '/admin/audit' && request.method === 'GET') return withCors(await listAdminAuditLogs(request, env));
+      if (pathname === '/admin/system/health' && request.method === 'GET') return withCors(await adminSystemHealth(request, env));
 
       if (pathname === '/auth/register' && request.method === 'POST') return withCors(await register(request, env));
       if (pathname === '/auth/login' && request.method === 'POST') return withCors(await login(request, env));
       if (pathname === '/auth/me' && request.method === 'GET') return withCors(await getMe(request, env));
+      if (pathname === '/auth/sessions' && request.method === 'GET') return withCors(await listSessions(request, env));
+      if (pathname === '/auth/sessions/revoke' && request.method === 'POST') return withCors(await revokeSession(request, env));
+      if (pathname === '/auth/sessions/revoke-all' && request.method === 'POST') return withCors(await revokeAllSessions(request, env));
       if (pathname === '/verify-payment' && request.method === 'POST') return withCors(await verifyPayment(request, env));
 
       if (pathname === '/files/upload' && request.method === 'POST') return withCors(await uploadFile(request, env));
@@ -197,7 +215,7 @@ function serveAdminPage() {
       text-transform: uppercase;
     }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    input, button {
+    input, button, select {
       border-radius: 2px;
       border: 1px solid var(--border-strong);
       background: var(--surface-accent);
@@ -206,7 +224,7 @@ function serveAdminPage() {
       font-family: var(--font-body);
       font-size: .84rem;
     }
-    input:focus, button:focus { outline: 1px solid var(--accent); outline-offset: 1px; }
+    input:focus, button:focus, select:focus { outline: 1px solid var(--accent); outline-offset: 1px; }
     button {
       cursor: pointer;
       background: var(--accent);
@@ -286,9 +304,13 @@ function serveAdminPage() {
       <h1 class="card-title">Admin Authentication</h1>
       <div class="row">
         <input id="password" type="password" placeholder="Admin password" style="min-width:260px" />
+        <input id="otp" type="text" placeholder="OTP (optional)" style="min-width:170px" />
         <button id="load" type="button">Load Users</button>
+        <button id="health-btn" type="button" class="btn-secondary">System Health</button>
+        <button id="audit-btn" type="button" class="btn-secondary">Audit Trail</button>
       </div>
       <p class="muted hint">This endpoint is intentionally hidden. Access requires the worker env var <span class="mono">ADMIN_PASSWORD</span>.</p>
+      <p class="muted hint">If <span class="mono">ADMIN_TOTP_SECRET</span> is set, OTP is required too.</p>
       <p class="muted hint">Use only over HTTPS.</p>
       <p id="status" class="muted hint" style="min-height:18px"></p>
     </div>
@@ -298,6 +320,24 @@ function serveAdminPage() {
         <h2 class="card-title" style="margin:0">User Capacity Controls</h2>
         <span id="count" class="muted">0 users</span>
       </div>
+      <div class="row" style="margin-top:10px">
+        <input id="user-search" type="text" placeholder="Search user email..." style="min-width:220px" />
+        <select id="user-filter">
+          <option value="all">All users</option>
+          <option value="disabled">Disabled only</option>
+          <option value="active">Active only</option>
+          <option value="near_cap">Near capacity (>=80%)</option>
+          <option value="unlimited">Unlimited cap</option>
+        </select>
+        <select id="user-sort">
+          <option value="created_desc">Newest</option>
+          <option value="created_asc">Oldest</option>
+          <option value="usage_desc">Highest usage</option>
+          <option value="usage_asc">Lowest usage</option>
+          <option value="email_asc">Email A-Z</option>
+          <option value="email_desc">Email Z-A</option>
+        </select>
+      </div>
       <div class="table-wrap" style="margin-top:10px">
         <table>
           <thead>
@@ -305,22 +345,44 @@ function serveAdminPage() {
               <th>Email</th>
               <th>Used</th>
               <th>Limit</th>
+              <th>Status</th>
               <th>Set new limit (GB or unlimited)</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="5" class="muted">Enter password and load users.</td></tr>
+            <tr><td colspan="6" class="muted">Enter password and load users.</td></tr>
           </tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">User Detail Drawer</h2>
+      <div id="user-detail" class="muted">Select “Details” on any user to inspect metadata.</div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">System Health</h2>
+      <pre id="health-output" class="muted" style="white-space:pre-wrap;line-height:1.45;max-height:220px;overflow:auto">// No health checks run yet.</pre>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Admin Audit Trail</h2>
+      <pre id="audit-output" class="muted" style="white-space:pre-wrap;line-height:1.45;max-height:260px;overflow:auto">// No audit logs loaded yet.</pre>
     </div>
     </div>
   </div>
 
   <script>
     let adminPassword = '';
+    let adminOtp = '';
     let users = [];
+    let activeFilters = {
+      query: '',
+      filter: 'all',
+      sort: 'created_desc',
+    };
 
     const GB = 1073741824;
     const LOAD_USERS_TIMEOUT_MS = 15000;
@@ -343,28 +405,125 @@ function serveAdminPage() {
       el.className = type;
     }
 
+    function getFilteredUsers() {
+      const q = String(activeFilters.query || '').trim().toLowerCase();
+      let list = users.filter((u) => {
+        const email = String(u.email || '').toLowerCase();
+        const cap = Number(u.storage_cap || 0);
+        const used = Number(u.storage_used || 0);
+        const unlimited = isUnlimitedStorage(cap);
+        const pct = unlimited ? 0 : (cap > 0 ? (used / cap) * 100 : 0);
+        const matchesQuery = !q || email.includes(q);
+        let matchesFilter = true;
+        if (activeFilters.filter === 'disabled') matchesFilter = Boolean(u.disabled);
+        if (activeFilters.filter === 'active') matchesFilter = !u.disabled;
+        if (activeFilters.filter === 'near_cap') matchesFilter = !unlimited && pct >= 80;
+        if (activeFilters.filter === 'unlimited') matchesFilter = unlimited;
+        return matchesQuery && matchesFilter;
+      });
+      list.sort((a, b) => {
+        if (activeFilters.sort === 'email_asc') return String(a.email || '').localeCompare(String(b.email || ''));
+        if (activeFilters.sort === 'email_desc') return String(b.email || '').localeCompare(String(a.email || ''));
+        if (activeFilters.sort === 'usage_asc') return Number(a.storage_used || 0) - Number(b.storage_used || 0);
+        if (activeFilters.sort === 'usage_desc') return Number(b.storage_used || 0) - Number(a.storage_used || 0);
+        if (activeFilters.sort === 'created_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+      return list;
+    }
+
+    async function openUserDetails(userId) {
+      try {
+        const res = await fetch('/admin/users/details?userId=' + encodeURIComponent(userId), {
+          headers: {
+            Authorization: 'Bearer ' + adminPassword,
+            'X-Admin-OTP': adminOtp,
+          },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed loading details');
+        const d = data.details || {};
+        const largest = Array.isArray(d.largestFiles) ? d.largestFiles : [];
+        const recent = Array.isArray(d.recentUploads) ? d.recentUploads : [];
+        document.getElementById('user-detail').textContent =
+          'User: ' + (data.user?.email || data.user?.id || '-') + '\n' +
+          'Disabled: ' + (data.user?.disabled ? 'Yes' : 'No') + '\n' +
+          'File count: ' + Number(d.fileCount || 0) + '\n' +
+          'Bandwidth today: ' + formatStorage(d?.bandwidth?.usedBytes || 0) + '\n' +
+          'Last activity: ' + (d.lastActivityAt ? new Date(d.lastActivityAt).toLocaleString() : 'Unknown') + '\n' +
+          'Recent uploads: ' + (recent.slice(0, 5).map((f) => String(f.name || 'unnamed')).join(', ') || 'None') + '\n' +
+          'Largest files: ' + (largest.slice(0, 5).map((f) => String(f.name || 'unnamed') + ' (' + formatStorage(f.size || 0) + ')').join(', ') || 'None');
+      } catch (err) {
+        document.getElementById('user-detail').textContent = 'Failed to load details: ' + (err.message || 'Unknown error');
+      }
+    }
+
+    async function loadSystemHealth() {
+      try {
+        const res = await fetch('/admin/system/health', {
+          headers: {
+            Authorization: 'Bearer ' + adminPassword,
+            'X-Admin-OTP': adminOtp,
+          },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Health check failed');
+        document.getElementById('health-output').textContent = JSON.stringify(data.health, null, 2);
+        setStatus('Health loaded.', 'ok');
+      } catch (err) {
+        document.getElementById('health-output').textContent = 'Health check failed: ' + (err.message || 'Unknown error');
+        setStatus(err.message || 'Health check failed', 'error');
+      }
+    }
+
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch('/admin/audit', {
+          headers: {
+            Authorization: 'Bearer ' + adminPassword,
+            'X-Admin-OTP': adminOtp,
+          },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Audit load failed');
+        document.getElementById('audit-output').textContent = JSON.stringify((data.logs || []).slice(0, 80), null, 2);
+        setStatus('Audit logs loaded.', 'ok');
+      } catch (err) {
+        document.getElementById('audit-output').textContent = 'Audit load failed: ' + (err.message || 'Unknown error');
+        setStatus(err.message || 'Audit load failed', 'error');
+      }
+    }
+
     function renderUsers() {
       const body = document.getElementById('users-body');
-      document.getElementById('count').textContent = String(users.length) + ' user' + (users.length === 1 ? '' : 's');
+      const viewUsers = getFilteredUsers();
+      document.getElementById('count').textContent = String(viewUsers.length) + ' user' + (viewUsers.length === 1 ? '' : 's');
 
-      if (!users.length) {
-        body.innerHTML = '<tr><td colspan="5" class="muted">No users found.</td></tr>';
+      if (!viewUsers.length) {
+        body.innerHTML = '<tr><td colspan="6" class="muted">No users found.</td></tr>';
         return;
       }
 
-      body.innerHTML = users.map((u) => {
+      body.innerHTML = viewUsers.map((u) => {
         const id = esc(u.id);
         const capUnlimited = isUnlimitedStorage(u.storage_cap);
         const limitGb = capUnlimited ? 'unlimited' : Number((Number(u.storage_cap || 0) / GB).toFixed(2));
+        const pct = capUnlimited ? 0 : (Number(u.storage_cap || 0) > 0 ? Math.round((Number(u.storage_used || 0) / Number(u.storage_cap || 0)) * 100) : 0);
+        const statusText = u.disabled ? ('Disabled' + (u.disabled_reason ? ' (' + esc(u.disabled_reason) + ')' : '')) : (capUnlimited ? 'Unlimited' : (pct >= 90 ? 'Critical' : (pct >= 80 ? 'Warning' : 'Active')));
         return '<tr>' +
           '<td>' + esc(u.email || '-') + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_used) + '</td>' +
           '<td class="mono">' + formatStorage(u.storage_cap) + '</td>' +
+          '<td class="mono">' + statusText + '</td>' +
           '<td><div class="row">' +
           '<input type="text" inputmode="text" aria-label="Storage limit in GB or unlimited" placeholder="1024 or unlimited" value="' + esc(limitGb) + '" data-cap="' + id + '" />' +
           '<button type="button" data-save="' + id + '">Save</button>' +
           '</div></td>' +
           '<td><div class="row">' +
+          '<button type="button" class="btn-secondary" data-details="' + id + '">Details</button>' +
+          (u.disabled
+            ? '<button type="button" class="btn-secondary" data-restore="' + id + '" data-email="' + esc(u.email || '') + '">Restore</button>'
+            : '<button type="button" class="btn-secondary" data-disable="' + id + '" data-email="' + esc(u.email || '') + '">Disable</button>') +
           '<button type="button" class="btn-secondary" data-purge="' + id + '" data-email="' + esc(u.email || '') + '">Purge Files</button>' +
           '<button type="button" class="btn-danger" data-delete="' + id + '" data-email="' + esc(u.email || '') + '">Delete Account</button>' +
           '</div></td>' +
@@ -396,6 +555,7 @@ function serveAdminPage() {
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + adminPassword,
+                'X-Admin-OTP': adminOtp,
               },
               body: JSON.stringify(payload),
             });
@@ -415,7 +575,8 @@ function serveAdminPage() {
         btn.addEventListener('click', async () => {
           const userId = btn.getAttribute('data-purge');
           const email = btn.getAttribute('data-email') || userId;
-          if (!confirm('Purge ALL files for ' + email + '?\\n\\nThis will delete every file from storage. The account will remain. This cannot be undone.')) return;
+          const typed = prompt('Type the exact user email or id to purge files for:\\n' + email);
+          if (!typed) return;
           btn.disabled = true;
           try {
             const res = await fetch('/admin/users/purge-files', {
@@ -423,8 +584,9 @@ function serveAdminPage() {
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + adminPassword,
+                'X-Admin-OTP': adminOtp,
               },
-              body: JSON.stringify({ userId }),
+              body: JSON.stringify({ userId, confirmation: typed.trim() }),
             });
             const data = await res.json();
             if (!res.ok || !data.ok) throw new Error(data.error || 'Purge failed');
@@ -442,7 +604,8 @@ function serveAdminPage() {
         btn.addEventListener('click', async () => {
           const userId = btn.getAttribute('data-delete');
           const email = btn.getAttribute('data-email') || userId;
-          if (!confirm('Permanently delete account for ' + email + '?\\n\\nThis will delete all files AND the account. This cannot be undone.')) return;
+          const typed = prompt('Type the exact user email or id to DELETE account:\\n' + email);
+          if (!typed) return;
           btn.disabled = true;
           try {
             const res = await fetch('/admin/users/delete', {
@@ -450,8 +613,9 @@ function serveAdminPage() {
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + adminPassword,
+                'X-Admin-OTP': adminOtp,
               },
-              body: JSON.stringify({ userId }),
+              body: JSON.stringify({ userId, confirmation: typed.trim() }),
             });
             const data = await res.json();
             if (!res.ok || !data.ok) throw new Error(data.error || 'Delete failed');
@@ -464,6 +628,69 @@ function serveAdminPage() {
           }
         });
       });
+
+      body.querySelectorAll('button[data-disable]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.getAttribute('data-disable');
+          const email = btn.getAttribute('data-email') || userId;
+          const reason = prompt('Disable account for ' + email + '. Optional reason:', 'Disabled by admin');
+          if (reason === null) return;
+          btn.disabled = true;
+          try {
+            const res = await fetch('/admin/users/disable', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + adminPassword,
+                'X-Admin-OTP': adminOtp,
+              },
+              body: JSON.stringify({ userId, reason: String(reason || '').trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Disable failed');
+            setStatus('Account disabled for ' + email + '.', 'ok');
+            await loadUsers();
+          } catch (err) {
+            setStatus(err.message || 'Disable failed', 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      body.querySelectorAll('button[data-restore]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.getAttribute('data-restore');
+          const email = btn.getAttribute('data-email') || userId;
+          btn.disabled = true;
+          try {
+            const res = await fetch('/admin/users/restore', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + adminPassword,
+                'X-Admin-OTP': adminOtp,
+              },
+              body: JSON.stringify({ userId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Restore failed');
+            setStatus('Account restored for ' + email + '.', 'ok');
+            await loadUsers();
+          } catch (err) {
+            setStatus(err.message || 'Restore failed', 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      body.querySelectorAll('button[data-details]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.getAttribute('data-details');
+          await openUserDetails(userId);
+        });
+      });
     }
 
     async function loadUsers() {
@@ -471,7 +698,10 @@ function serveAdminPage() {
       const timeout = setTimeout(() => controller.abort(), LOAD_USERS_TIMEOUT_MS);
       try {
         const res = await fetch('/admin/users', {
-          headers: { Authorization: 'Bearer ' + adminPassword },
+          headers: {
+            Authorization: 'Bearer ' + adminPassword,
+            'X-Admin-OTP': adminOtp,
+          },
           signal: controller.signal,
         });
         const data = await res.json();
@@ -496,9 +726,16 @@ function serveAdminPage() {
     }
 
     const loadBtn = document.getElementById('load');
+    const healthBtn = document.getElementById('health-btn');
+    const auditBtn = document.getElementById('audit-btn');
     const passwordInput = document.getElementById('password');
+    const otpInput = document.getElementById('otp');
+    const userSearchInput = document.getElementById('user-search');
+    const userFilterInput = document.getElementById('user-filter');
+    const userSortInput = document.getElementById('user-sort');
     async function handleLoadClick() {
       adminPassword = passwordInput.value.trim();
+      adminOtp = otpInput.value.trim();
       if (!adminPassword) {
         setStatus('Enter admin password first.', 'error');
         return;
@@ -512,10 +749,34 @@ function serveAdminPage() {
       }
     }
     loadBtn.addEventListener('click', handleLoadClick);
+    healthBtn.addEventListener('click', async () => {
+      adminPassword = passwordInput.value.trim();
+      adminOtp = otpInput.value.trim();
+      if (!adminPassword) return setStatus('Enter admin password first.', 'error');
+      await loadSystemHealth();
+    });
+    auditBtn.addEventListener('click', async () => {
+      adminPassword = passwordInput.value.trim();
+      adminOtp = otpInput.value.trim();
+      if (!adminPassword) return setStatus('Enter admin password first.', 'error');
+      await loadAuditLogs();
+    });
     passwordInput.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
       handleLoadClick();
+    });
+    userSearchInput.addEventListener('input', () => {
+      activeFilters.query = userSearchInput.value;
+      renderUsers();
+    });
+    userFilterInput.addEventListener('change', () => {
+      activeFilters.filter = userFilterInput.value;
+      renderUsers();
+    });
+    userSortInput.addEventListener('change', () => {
+      activeFilters.sort = userSortInput.value;
+      renderUsers();
     });
   </script>
 </body>
@@ -532,7 +793,13 @@ async function listAdminUsers(request, env) {
   if (adminError) return adminError;
 
   const users = await sbGet(env, 'users?select=id,email,storage_used,storage_cap,created_at&order=created_at.desc');
-  return jsonOk({ users });
+  return jsonOk({
+    users: users.map((u) => ({
+      ...u,
+      disabled: isUserSoftDisabled(u.id),
+      disabled_reason: isUserSoftDisabled(u.id) ? SOFT_DISABLED_USERS.get(String(u.id)).reason : '',
+    })),
+  });
 }
 
 async function updateUserStorageLimit(request, env) {
@@ -555,6 +822,7 @@ async function updateUserStorageLimit(request, env) {
   }
 
   const updated = await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_cap: storageCapBytes });
+  logAdminAudit(request, 'update_storage_limit', { userId, storageCapBytes });
   return jsonOk({ user: updated[0] || { ...current, storage_cap: storageCapBytes } });
 }
 
@@ -581,13 +849,19 @@ async function adminPurgeUserFiles(request, env) {
 
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
+  const confirmation = String(body.confirmation || '').trim();
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
 
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  const targetEmail = String(users[0].email || '');
+  if (confirmation !== targetEmail && confirmation !== userId) {
+    return jsonError('Type the exact user email or id to confirm purge', 400, 'missing_typed_confirmation');
+  }
 
   const purged = await deleteUserFiles(userId, env);
   await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_used: 0 });
+  logAdminAudit(request, 'purge_user_files', { userId, email: targetEmail, purged });
 
   return jsonOk({ purged });
 }
@@ -598,15 +872,139 @@ async function adminDeleteUser(request, env) {
 
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
+  const confirmation = String(body.confirmation || '').trim();
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
 
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  const targetEmail = String(users[0].email || '');
+  if (confirmation !== targetEmail && confirmation !== userId) {
+    return jsonError('Type the exact user email or id to confirm delete', 400, 'missing_typed_confirmation');
+  }
 
   const filesRemoved = await deleteUserFiles(userId, env);
   await sbDelete(env, `users?id=eq.${enc(userId)}`);
+  clearSessionsForUser(userId);
+  SOFT_DISABLED_USERS.delete(String(userId));
+  logAdminAudit(request, 'delete_user', { userId, email: targetEmail, filesRemoved });
 
   return jsonOk({ deleted: true, filesRemoved });
+}
+
+async function adminDisableUser(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  const reason = String(body.reason || '').trim().slice(0, 200) || 'Disabled by admin';
+  if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  SOFT_DISABLED_USERS.set(String(userId), {
+    reason,
+    disabledAt: new Date().toISOString(),
+  });
+  clearSessionsForUser(userId);
+  logAdminAudit(request, 'disable_user', { userId, email: users[0].email, reason });
+  return jsonOk({ disabled: true, userId, reason });
+}
+
+async function adminRestoreUser(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+  const body = await request.json().catch(() => ({}));
+  const userId = String(body.userId || '').trim();
+  if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  SOFT_DISABLED_USERS.delete(String(userId));
+  logAdminAudit(request, 'restore_user', { userId, email: users[0].email });
+  return jsonOk({ restored: true, userId });
+}
+
+async function adminUserDetails(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+  const { searchParams } = new URL(request.url);
+  const userId = String(searchParams.get('userId') || '').trim();
+  if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
+
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email,storage_used,storage_cap,created_at`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  const files = await sbGet(env, `files?user_id=eq.${enc(userId)}&select=id,name,size,uploaded_at&order=uploaded_at.desc`);
+  const dayKey = currentUtcDayKey();
+  const usageKey = `${String(userId)}:${dayKey}`;
+  const usedBandwidthBytes = Number(BANDWIDTH_USAGE_CACHE.get(usageKey) || 0);
+  const sessions = SESSION_STORE.get(String(userId)) || [];
+  return jsonOk({
+    user: {
+      ...users[0],
+      disabled: isUserSoftDisabled(userId),
+      disabled_reason: isUserSoftDisabled(userId) ? SOFT_DISABLED_USERS.get(String(userId)).reason : '',
+    },
+    details: {
+      fileCount: files.length,
+      largestFiles: [...files].sort((a, b) => Number(b.size || 0) - Number(a.size || 0)).slice(0, 5),
+      recentUploads: files.slice(0, 8),
+      bandwidth: {
+        dayKey,
+        usedBytes: usedBandwidthBytes,
+      },
+      lastActivityAt: sessions.reduce((acc, s) => {
+        const t = Date.parse(s.lastSeenAt || 0);
+        return t > acc ? t : acc;
+      }, 0) || null,
+    },
+  });
+}
+
+async function listAdminAuditLogs(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+  return jsonOk({ logs: [...ADMIN_AUDIT_LOGS].reverse() });
+}
+
+async function adminSystemHealth(request, env) {
+  const adminError = await requireAdmin(request, env);
+  if (adminError) return adminError;
+  const health = {
+    timestamp: new Date().toISOString(),
+    checks: {
+      supabase: { ok: false, detail: '' },
+      telegram: { ok: false, detail: '' },
+      bridge: { ok: false, detail: '' },
+    },
+  };
+  try {
+    await sbGet(env, 'users?select=id&limit=1');
+    health.checks.supabase = { ok: true, detail: 'reachable' };
+  } catch (err) {
+    health.checks.supabase = { ok: false, detail: String(err?.message || 'failed') };
+  }
+  try {
+    const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getMe`);
+    const tgData = await tgRes.json().catch(() => ({}));
+    health.checks.telegram = { ok: tgRes.ok && tgData.ok === true, detail: tgData.description || (tgRes.ok ? 'reachable' : `HTTP ${tgRes.status}`) };
+  } catch (err) {
+    health.checks.telegram = { ok: false, detail: String(err?.message || 'failed') };
+  }
+  try {
+    const bridgeRes = await fetch(`${env.BRIDGE_URL}/health`, {
+      headers: {
+        'x-bridge-secret': env.BRIDGE_SECRET,
+      },
+    });
+    health.checks.bridge = { ok: bridgeRes.ok, detail: bridgeRes.ok ? 'reachable' : `HTTP ${bridgeRes.status}` };
+  } catch (err) {
+    health.checks.bridge = { ok: false, detail: String(err?.message || 'failed') };
+  }
+  return jsonOk({
+    health,
+    lockout: {
+      active: [...ADMIN_LOCKOUTS.entries()].map(([key, until]) => ({ key, until })),
+      failedAttemptsTracked: ADMIN_AUTH_ATTEMPTS.size,
+    },
+  });
 }
 
 function parseStorageCapBytes(body) {
@@ -643,13 +1041,25 @@ async function requireAdmin(request, env) {
 
   const configured = String(env.ADMIN_PASSWORD || '');
   if (!configured) return jsonError('ADMIN_PASSWORD is not configured', 500, 'admin_not_configured');
+  const adminKey = getAdminRateKey(request);
+  const lockoutUntil = Number(ADMIN_LOCKOUTS.get(adminKey) || 0);
+  if (lockoutUntil > Date.now()) {
+    return jsonError('Admin access temporarily locked due to repeated failed attempts', 429, 'admin_temporarily_locked');
+  }
 
   const authHeader = String(request.headers.get('Authorization') || '');
   const suppliedFromBearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   const supplied = String(suppliedFromBearer || request.headers.get('X-Admin-Password') || '');
-  if (!safeEqual(supplied, configured)) {
+  const passwordOk = safeEqual(supplied, configured);
+  const otpRequired = String(env.ADMIN_TOTP_SECRET || '').trim().length > 0;
+  const suppliedOtp = String(request.headers.get('X-Admin-OTP') || request.headers.get('X-Admin-TOTP') || '');
+  const otpOk = !otpRequired || await verifyAdminTotp(String(env.ADMIN_TOTP_SECRET || ''), suppliedOtp);
+  if (!(passwordOk && otpOk)) {
+    registerAdminAuthFailure(adminKey);
     return jsonError('Unauthorized', 401, 'unauthorized_admin');
   }
+  ADMIN_AUTH_ATTEMPTS.delete(adminKey);
+  ADMIN_LOCKOUTS.delete(adminKey);
 
   return null;
 }
@@ -687,8 +1097,9 @@ async function register(request, env) {
   if (!created?.length) return jsonError('Account creation failed', 500, 'account_creation_failed');
   const user = created[0];
 
-  const token = await makeJWT({ userId: user.id, email: user.email }, env.JWT_SECRET);
-  return jsonOk({ token, email: user.email });
+  const session = createUserSession(user.id, request);
+  const token = await makeJWT({ userId: user.id, email: user.email, sid: session.id }, env.JWT_SECRET);
+  return jsonOk({ token, email: user.email, session: session.publicView });
 }
 
 async function login(request, env) {
@@ -699,15 +1110,54 @@ async function login(request, env) {
     return jsonError('Invalid credentials', 401, 'invalid_credentials');
   }
   const user = users[0];
-  const token = await makeJWT({ userId: user.id, email: user.email }, env.JWT_SECRET);
-  return jsonOk({ token, email: user.email, storage_used: user.storage_used, storage_cap: user.storage_cap });
+  if (isUserSoftDisabled(user.id)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  const session = createUserSession(user.id, request);
+  const token = await makeJWT({ userId: user.id, email: user.email, sid: session.id }, env.JWT_SECRET);
+  return jsonOk({ token, email: user.email, storage_used: user.storage_used, storage_cap: user.storage_cap, session: session.publicView });
 }
 
 async function getMe(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=*`);
-  return users.length ? jsonOk(users[0]) : jsonError('User not found', 404, 'user_not_found');
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  touchSession(auth.userId, auth.sid, request);
+  return jsonOk({
+    ...users[0],
+    disabled: isUserSoftDisabled(auth.userId),
+  });
+}
+
+async function listSessions(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
+  const sessions = (SESSION_STORE.get(String(auth.userId)) || []).map((s) => ({
+    ...s.publicView,
+    current: String(s.id) === String(auth.sid),
+  }));
+  return jsonOk({ sessions });
+}
+
+async function revokeSession(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  const body = await request.json().catch(() => ({}));
+  const sessionId = String(body.sessionId || '').trim();
+  if (!sessionId) return jsonError('sessionId is required', 400, 'missing_session_id');
+  revokeUserSession(auth.userId, sessionId);
+  return jsonOk({ revoked: true, sessionId });
+}
+
+async function revokeAllSessions(request, env) {
+  const auth = await requireAuth(request, env);
+  if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  clearSessionsForUser(auth.userId);
+  return jsonOk({ revokedAll: true });
 }
 
 function normalizePaymentCurrency(currency) {
@@ -856,6 +1306,7 @@ async function fetchJsonFromApi(url, defaultErrorMessage) {
 async function verifyPayment(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
 
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
@@ -967,6 +1418,8 @@ async function verifyPayment(request, env) {
 async function uploadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
 
   const formData = await request.formData();
   const file = formData.get('file');
@@ -1073,6 +1526,8 @@ async function enforceDailyBandwidthLimit(env, userId, transferBytes) {
 async function listFiles(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
   const files = await sbGet(env, `files?user_id=eq.${auth.userId}&order=uploaded_at.desc&select=*`);
   return jsonOk({ files });
 }
@@ -1080,6 +1535,8 @@ async function listFiles(request, env) {
 async function downloadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
 
   const { searchParams } = new URL(request.url);
   const fileId = searchParams.get('fileId');
@@ -1113,6 +1570,8 @@ async function downloadFile(request, env) {
 async function viewFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
 
   const { searchParams } = new URL(request.url);
   const fileId = searchParams.get('fileId');
@@ -1157,6 +1616,8 @@ async function viewFile(request, env) {
 async function deleteFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
+  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  touchSession(auth.userId, auth.sid, request);
 
   const { fileRecordId } = await request.json().catch(() => ({}));
   if (!fileRecordId) return jsonError('fileRecordId required', 400, 'missing_file_record_id');
@@ -1225,7 +1686,11 @@ async function sbDelete(env, q) {
 async function makeJWT(payload, secret) {
   const encb64 = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   const head = encb64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = encb64(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY_SECONDS }));
+  const body = encb64(JSON.stringify({
+    ...payload,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY_SECONDS,
+  }));
   const data = `${head}.${body}`;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
@@ -1236,9 +1701,13 @@ async function verifyJWT(token, secret) {
   try {
     const [h, p, s] = token.split('.');
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-    const sigBuf = Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const sigB64 = s.replace(/-/g, '+').replace(/_/g, '/');
+    const sigPad = sigB64 + '='.repeat((4 - (sigB64.length % 4)) % 4);
+    const sigBuf = Uint8Array.from(atob(sigPad), (c) => c.charCodeAt(0));
     const ok = await crypto.subtle.verify('HMAC', key, sigBuf, new TextEncoder().encode(`${h}.${p}`));
-    const decoded = JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/')));
+    const payloadB64 = p.replace(/-/g, '+').replace(/_/g, '/');
+    const payloadPad = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4);
+    const decoded = JSON.parse(atob(payloadPad));
     return ok && decoded.exp > Date.now() / 1000 ? decoded : null;
   } catch {
     return null;
@@ -1247,7 +1716,170 @@ async function verifyJWT(token, secret) {
 
 async function requireAuth(request, env) {
   const auth = request.headers.get('Authorization') || '';
-  return auth.startsWith('Bearer ') ? verifyJWT(auth.slice(7), env.JWT_SECRET) : null;
+  if (!auth.startsWith('Bearer ')) return null;
+  const payload = await verifyJWT(auth.slice(7), env.JWT_SECRET);
+  if (!payload) return null;
+  if (payload?.sid && REVOKED_SESSION_IDS.has(String(payload.sid))) return null;
+  if (payload?.sid && !hasSession(payload?.userId, payload?.sid)) return null;
+  return payload;
+}
+
+function randomId(size = 16) {
+  const bytes = crypto.getRandomValues(new Uint8Array(size));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getRequestIp(request) {
+  return String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
+}
+
+function getRequestUserAgent(request) {
+  return String(request.headers.get('user-agent') || '').slice(0, 220);
+}
+
+function createUserSession(userId, request) {
+  const id = randomId(16);
+  const now = new Date().toISOString();
+  const session = {
+    id,
+    createdAt: now,
+    lastSeenAt: now,
+    ip: getRequestIp(request),
+    userAgent: getRequestUserAgent(request),
+  };
+  const key = String(userId);
+  const current = SESSION_STORE.get(key) || [];
+  const next = [session, ...current].slice(0, 20);
+  SESSION_STORE.set(key, next);
+  return {
+    ...session,
+    publicView: {
+      id: session.id,
+      createdAt: session.createdAt,
+      lastSeenAt: session.lastSeenAt,
+      ip: session.ip,
+      userAgent: session.userAgent,
+    },
+  };
+}
+
+function hasSession(userId, sessionId) {
+  const sessions = SESSION_STORE.get(String(userId)) || [];
+  return sessions.some((s) => String(s.id) === String(sessionId));
+}
+
+function touchSession(userId, sessionId, request) {
+  if (!sessionId) return;
+  const key = String(userId);
+  const sessions = SESSION_STORE.get(key) || [];
+  let touched = false;
+  const now = new Date().toISOString();
+  const next = sessions.map((s) => {
+    if (String(s.id) !== String(sessionId)) return s;
+    touched = true;
+    return {
+      ...s,
+      lastSeenAt: now,
+      ip: getRequestIp(request) || s.ip,
+      userAgent: getRequestUserAgent(request) || s.userAgent,
+    };
+  });
+  if (touched) SESSION_STORE.set(key, next);
+}
+
+function revokeUserSession(userId, sessionId) {
+  const key = String(userId);
+  const sessions = SESSION_STORE.get(key) || [];
+  SESSION_STORE.set(key, sessions.filter((s) => String(s.id) !== String(sessionId)));
+  REVOKED_SESSION_IDS.add(String(sessionId));
+}
+
+function clearSessionsForUser(userId) {
+  const key = String(userId);
+  const sessions = SESSION_STORE.get(key) || [];
+  sessions.forEach((s) => REVOKED_SESSION_IDS.add(String(s.id)));
+  SESSION_STORE.delete(key);
+}
+
+function isUserSoftDisabled(userId) {
+  return SOFT_DISABLED_USERS.has(String(userId));
+}
+
+function getAdminRateKey(request) {
+  return getRequestIp(request);
+}
+
+function registerAdminAuthFailure(rateKey) {
+  const now = Date.now();
+  const attempts = ADMIN_AUTH_ATTEMPTS.get(rateKey) || [];
+  const filtered = attempts.filter((t) => now - t < ADMIN_RATE_LIMIT_WINDOW_MS);
+  filtered.push(now);
+  ADMIN_AUTH_ATTEMPTS.set(rateKey, filtered);
+  if (filtered.length >= ADMIN_MAX_FAILED_ATTEMPTS) {
+    ADMIN_LOCKOUTS.set(rateKey, now + ADMIN_LOCKOUT_MS);
+    ADMIN_AUTH_ATTEMPTS.delete(rateKey);
+  }
+}
+
+function logAdminAudit(request, action, details = {}) {
+  ADMIN_AUDIT_LOGS.push({
+    id: randomId(10),
+    at: new Date().toISOString(),
+    action,
+    ip: getRequestIp(request),
+    userAgent: getRequestUserAgent(request),
+    details,
+  });
+  if (ADMIN_AUDIT_LOGS.length > ADMIN_AUDIT_LOG_LIMIT) {
+    ADMIN_AUDIT_LOGS.splice(0, ADMIN_AUDIT_LOGS.length - ADMIN_AUDIT_LOG_LIMIT);
+  }
+}
+
+function base32Decode(input = '') {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const cleaned = String(input).toUpperCase().replace(/=+$/g, '').replace(/[^A-Z2-7]/g, '');
+  let bits = '';
+  for (const ch of cleaned) {
+    const idx = alphabet.indexOf(ch);
+    if (idx < 0) continue;
+    bits += idx.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  return new Uint8Array(bytes);
+}
+
+function hotp(secretBytes, counter) {
+  const msg = new ArrayBuffer(8);
+  const view = new DataView(msg);
+  const high = Math.floor(counter / 2 ** 32);
+  const low = counter >>> 0;
+  view.setUint32(0, high);
+  view.setUint32(4, low);
+  return crypto.subtle
+    .importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+    .then((key) => crypto.subtle.sign('HMAC', key, msg))
+    .then((sig) => {
+      const bytes = new Uint8Array(sig);
+      const offset = bytes[bytes.length - 1] & 0x0f;
+      const code = ((bytes[offset] & 0x7f) << 24)
+        | ((bytes[offset + 1] & 0xff) << 16)
+        | ((bytes[offset + 2] & 0xff) << 8)
+        | (bytes[offset + 3] & 0xff);
+      return String(code % 1_000_000).padStart(6, '0');
+    });
+}
+
+function verifyAdminTotp(secret, suppliedCode) {
+  const code = String(suppliedCode || '').replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(code)) return false;
+  const secretBytes = base32Decode(secret);
+  if (!secretBytes.length) return false;
+  const nowStep = Math.floor(Date.now() / 1000 / 30);
+  const candidates = [nowStep - 1, nowStep, nowStep + 1];
+  return Promise.all(candidates.map((step) => hotp(secretBytes, step)))
+    .then((codes) => codes.includes(code))
+    .catch(() => false);
 }
 
 async function hashPassword(password) {
