@@ -27,7 +27,7 @@ const PAYMENT_WALLETS = {
   XMR: '4254cXFs8vLXCEVm1T7TDAdovjqMiNZX8aym8DiMM2EiUVbDnhRQt6uauFyTeP2pkqXtcodDWPoPg1nrQNsz8xuqP3q3rrQ',
 };
 const DEFAULT_TIER_CONFIG = {
-  starter: { priceEur: 0.00, storageLimit: 50 * GB },
+  starter: { priceEur: 0, storageLimit: 50 * GB },
   pro: { priceEur: 2.50, storageLimit: 500 * GB },
   creator: { priceEur: 9.00, storageLimit: 2 * 1024 * GB },
   studio: { priceEur: 35.00, storageLimit: 15 * 1024 * GB },
