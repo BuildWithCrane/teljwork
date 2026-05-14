@@ -1028,7 +1028,7 @@ function currentUtcDayKey() {
 
 function getDailyBandwidthCapBytes(storageCapBytes) {
   const cap = Number(storageCapBytes);
-  if (Number.isFinite(cap) && cap < 0) return DAILY_BANDWIDTH_LIMITS.studio;
+  if (cap < 0) return DAILY_BANDWIDTH_LIMITS.studio;
   if (!Number.isFinite(cap) || cap <= 0) return DAILY_BANDWIDTH_LIMITS.starter;
   if (cap >= DEFAULT_TIER_CONFIG.creator.storageLimit) return DAILY_BANDWIDTH_LIMITS.creator;
   if (cap >= DEFAULT_TIER_CONFIG.pro.storageLimit) return DAILY_BANDWIDTH_LIMITS.pro;
@@ -1045,10 +1045,13 @@ function consumeDailyBandwidth(userId, storageCapBytes, transferBytes) {
   const dayKey = currentUtcDayKey();
   const usageKey = `${String(userId)}:${dayKey}`;
   const used = Number(BANDWIDTH_USAGE_CACHE.get(usageKey) || 0);
-  if (used + bytes > capBytes) return { allowed: false, limitBytes: capBytes, usedBytes: used, requestedBytes: bytes };
+  const attemptedUsedBytes = used + bytes;
+  if (attemptedUsedBytes > capBytes) {
+    return { allowed: false, limitBytes: capBytes, usedBytes: used, attemptedUsedBytes, requestedBytes: bytes };
+  }
 
-  BANDWIDTH_USAGE_CACHE.set(usageKey, used + bytes);
-  return { allowed: true, limitBytes: capBytes, usedBytes: used + bytes };
+  BANDWIDTH_USAGE_CACHE.set(usageKey, attemptedUsedBytes);
+  return { allowed: true, limitBytes: capBytes, usedBytes: attemptedUsedBytes };
 }
 
 async function enforceDailyBandwidthLimit(env, userId, transferBytes) {
