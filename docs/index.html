@@ -11,10 +11,10 @@
     
     <style>
         :root {
-            --accent: #ff6b00;
-            --bg: #ffffff;
-            --sidebar: #f8f8f8;
-            --text-main: #1a1a1a;
+            --accent: #FF6B00;
+            --bg: #FFFFFF;
+            --sidebar: #FFFFFF;
+            --text-main: #000000;
             --text-sub: #666666;
             --border: #eeeeee;
             --code-bg: #f1f1f1;
@@ -141,6 +141,38 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        .tier-selector {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0 12px;
+        }
+
+        .tier-selector label {
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-main);
+        }
+
+        .tier-selector select {
+            min-width: 220px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 11px 14px;
+            font: inherit;
+            color: var(--text-main);
+            background: #FFFFFF;
+        }
+
+        .tier-selector-note {
+            color: var(--text-sub);
+            font-size: 0.85rem;
+            margin: 0 0 18px;
+        }
+
         @media (max-width: 768px) {
             .sidebar { display: none; }
             main { margin-left: 0; padding: 40px 8%; }
@@ -234,7 +266,7 @@
             
             <div class="info-box">
                 <strong><i class="fas fa-clock"></i> Expected Latency:</strong> 
-                Standard retrieval usually completes within 1-3 minutes depending on payload size and network traffic. High-priority Pro and Creator slots receive bandwidth preference.
+                Standard retrieval usually completes within 1-3 minutes depending on payload size and network traffic. During that reassembly window, higher-tier Vault/Monolith slots (Pro/Creator) receive bandwidth preference over lower-priority traffic.
             </div>
         </section>
 
@@ -275,6 +307,16 @@
         <section id="limits">
             <h2>Network Limits</h2>
             <p>To maintain network health and ensure fair access for all users, the following industrial limits are enforced:</p>
+            <div class="tier-selector">
+                <label for="tier-bandwidth-selector">Active Tier</label>
+                <select id="tier-bandwidth-selector">
+                    <option value="starter">Starter</option>
+                    <option value="pro">Vault</option>
+                    <option value="creator">Monolith</option>
+                    <option value="studio">Colossus</option>
+                </select>
+            </div>
+            <p id="tier-bandwidth-note" class="tier-selector-note">Select a tier to inspect its current daily bandwidth allocation.</p>
             <div class="table-wrap">
                 <table style="width: 100%; border-collapse: collapse; margin-top: 20px; min-width: 320px;">
                     <tr style="background: var(--sidebar); text-align: left;">
@@ -287,7 +329,7 @@
                     </tr>
                     <tr>
                         <td style="padding: 15px; border: 1px solid var(--border);">Daily Bandwidth</td>
-                        <td style="padding: 15px; border: 1px solid var(--border);">Tier Dependent</td>
+                        <td id="daily-bandwidth-value" style="padding: 15px; border: 1px solid var(--border);">10GB Daily Bandwidth</td>
                     </tr>
                     <tr>
                         <td style="padding: 15px; border: 1px solid var(--border);">Encryption</td>
@@ -301,6 +343,81 @@
             © 2026 ARK CLOUD SYSTEMS | Technical Documentation | Confidentiality Level: Public
         </footer>
     </main>
+
+    <script>
+        const DEFAULT_WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
+        const WORKER_URL = String(window.ARK_WORKER_URL || DEFAULT_WORKER_URL).trim();
+        const GB = 1073741824;
+        const tierBandwidthSelector = document.getElementById('tier-bandwidth-selector');
+        const dailyBandwidthValue = document.getElementById('daily-bandwidth-value');
+        const tierBandwidthNote = document.getElementById('tier-bandwidth-note');
+        const tierConfigurations = {
+            starter: {
+                label: 'Starter',
+                storageCap: 50 * GB,
+                bandwidth: '10GB Daily Bandwidth',
+            },
+            pro: {
+                label: 'Vault',
+                storageCap: 500 * GB,
+                bandwidth: '100GB Daily Bandwidth',
+            },
+            creator: {
+                label: 'Monolith',
+                storageCap: 2 * 1024 * GB,
+                bandwidth: 'Priority Unlimited Bandwidth',
+            },
+            studio: {
+                label: 'Colossus',
+                storageCap: 15 * 1024 * GB,
+                bandwidth: 'Priority Unlimited Bandwidth',
+            },
+        };
+
+        function resolveTierFromStorageCap(storageCap) {
+            const normalizedStorageCap = Number(storageCap);
+            if (!Number.isFinite(normalizedStorageCap)) return 'starter';
+            const activeTier = Object.entries(tierConfigurations).find(([, config]) => config.storageCap === normalizedStorageCap);
+            return activeTier ? activeTier[0] : 'starter';
+        }
+
+        function renderBandwidthForTier(tierName, note) {
+            const config = tierConfigurations[tierName] || tierConfigurations.starter;
+            tierBandwidthSelector.value = tierName in tierConfigurations ? tierName : 'starter';
+            dailyBandwidthValue.textContent = config.bandwidth;
+            tierBandwidthNote.textContent = note || `${config.label} limits loaded.`;
+        }
+
+        async function syncTierSelectionFromSession() {
+            const token = localStorage.getItem('jwork_token');
+            if (!token) {
+                renderBandwidthForTier('starter', 'Starter limits shown by default. Sign in to auto-detect your active slot.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${WORKER_URL}/auth/me`, {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data) throw new Error('Unable to load active tier');
+                const activeTier = resolveTierFromStorageCap(data.storage_cap);
+                renderBandwidthForTier(activeTier, `${tierConfigurations[activeTier].label} slot detected from your active session.`);
+            } catch (_err) {
+                renderBandwidthForTier('starter', 'Starter limits shown by default. Sign in again to refresh your active slot.');
+            }
+        }
+
+        tierBandwidthSelector.addEventListener('change', (event) => {
+            const selectedTier = String(event.target.value || 'starter');
+            renderBandwidthForTier(selectedTier, `${tierConfigurations[selectedTier].label} limits selected.`);
+        });
+
+        syncTierSelectionFromSession();
+    </script>
 
 </body>
 </html>

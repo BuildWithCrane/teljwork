@@ -11,11 +11,11 @@
 
     <style>
         :root {
-            --accent: #ff6b00;
+            --accent: #FF6B00;
             --accent-soft: rgba(255, 107, 0, 0.1);
-            --bg: #fdfdfd;
-            --card-bg: #ffffff;
-            --text-main: #121212;
+            --bg: #FFFFFF;
+            --card-bg: #FFFFFF;
+            --text-main: #000000;
             --text-sub: #5a5a5a;
             --border: #ececec;
         }
@@ -54,7 +54,7 @@
             z-index: 1000;
             backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
-            background: rgba(253, 253, 253, 0.85);
+            background: rgba(255, 255, 255, 0.88);
             border-bottom: 1px solid var(--border);
             padding: 18px 8%;
             display: flex;
@@ -210,7 +210,7 @@
 
         /* --- STATS BAR --- */
         .stats-bar {
-            background: var(--text-main);
+            background: #000000;
             color: white;
             width: 100%;
             padding: 60px 8%;
@@ -296,7 +296,7 @@
             display: inline-block;
         }
 
-        .card:hover .btn {
+        .card:hover .btn:not(.current):not(.disabled) {
             background: var(--accent);
         }
 
@@ -305,6 +305,21 @@
             background: #f0f0f0;
             color: #aaa;
             pointer-events: none;
+        }
+
+        .xmr-disclaimer {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border: 1px solid rgba(255, 107, 0, 0.2);
+            border-radius: 999px;
+            background: rgba(255, 107, 0, 0.08);
+            color: var(--accent);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .payment-modal {
@@ -377,7 +392,7 @@
             padding: 60px 8%;
             text-align: center;
             border-top: 1px solid var(--border);
-            background: #fafafa;
+            background: #FFFFFF;
         }
 
         /* --- MOBILE OVERRIDES --- */
@@ -537,6 +552,12 @@
             <i class="fa-solid fa-shield-halved" style="color: var(--accent);"></i>
             Privacy Guaranteed: We accept BTC, LTC, and XMR
         </div>
+        <div style="display: flex; justify-content: center;">
+            <div class="xmr-disclaimer" title="Monero payments require manual verification">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Monero payments require manual verification
+            </div>
+        </div>
 
         <div class="price-container">
             <!-- STARTER TIER -->
@@ -546,10 +567,13 @@
                 <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">50GB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
                     <li style="margin-bottom: 15px;"><i class="fas fa-user-shield" style="color: var(--accent); margin-right: 12px;"></i> Privacy-First Policy</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-lock" style="color: var(--accent); margin-right: 12px;"></i> AES-256 Server-Side Encryption</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-bolt-lightning" style="color: var(--accent); margin-right: 12px;"></i> Standard Retrieval</li>
-                    <li style="margin-bottom: 15px;"><i class="fas fa-box" style="color: var(--accent); margin-right: 12px;"></i> 2GB Max Payload</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-box" style="color: var(--accent); margin-right: 12px;"></i> 2GB Industrial Limit</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-tower-broadcast" style="color: var(--accent); margin-right: 12px;"></i> 10GB Daily Bandwidth</li>
                 </ul>
-                <a href="#" class="btn current">Active Slot</a>
+                <a href="/auth/" class="btn js-tier-btn js-starter-btn" data-tier="starter" data-plan="Starter">Deploy Starter</a>
             </div>
 
             <!-- VAULT TIER -->
@@ -559,11 +583,12 @@
                 <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">500GB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
                     <li style="margin-bottom: 15px;"><i class="fas fa-infinity" style="color: var(--accent); margin-right: 12px;"></i> Zero Egress Fees</li>
-                    <!-- FIXED ICON BELOW -->
+                    <li style="margin-bottom: 15px;"><i class="fas fa-lock" style="color: var(--accent); margin-right: 12px;"></i> AES-256 Server-Side Encryption</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-clock" style="color: var(--accent); margin-right: 12px;"></i> 1-3 Min Retrieval</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-tower-broadcast" style="color: var(--accent); margin-right: 12px;"></i> 100GB Daily Bandwidth</li>
                 </ul>
-                <a href="#" class="btn js-btc-pay-btn" data-tier="pro" data-plan="Vault">Deploy Vault</a>
+                <a href="#" class="btn js-tier-btn js-btc-pay-btn" data-tier="pro" data-plan="Vault">Deploy Vault</a>
             </div>
 
             <!-- MONOLITH TIER -->
@@ -572,11 +597,13 @@
                 <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€9.00<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
                 <div style="font-size: 0.85rem; font-weight: 800; background: var(--accent); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">2TB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
-                    <li style="margin-bottom: 15px;"><i class="fas fa-gauge-high" style="color: var(--accent); margin-right: 12px;"></i> Priority Bandwidth</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-gauge-high" style="color: var(--accent); margin-right: 12px;"></i> Priority Unlimited Bandwidth</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-lock" style="color: var(--accent); margin-right: 12px;"></i> AES-256 Server-Side Encryption</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-layer-group" style="color: var(--accent); margin-right: 12px;"></i> Creator Slot Status</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-code" style="color: var(--accent); margin-right: 12px;"></i> Full API Access</li>
                 </ul>
-                <a href="#" class="btn js-btc-pay-btn" data-tier="creator" data-plan="Monolith" style="background: var(--accent);">Deploy Monolith</a>
+                <a href="#" class="btn js-tier-btn js-btc-pay-btn" data-tier="creator" data-plan="Monolith" style="background: var(--accent);">Deploy Monolith</a>
             </div>
 
             <!-- COLOSSUS TIER -->
@@ -585,11 +612,14 @@
                 <div style="font-size: 2rem; font-weight: 900; margin: 20px 0;">€35.00<span style="font-size: 0.8rem; opacity: 0.5;">/mo</span></div>
                 <div style="font-size: 0.85rem; font-weight: 800; background: var(--text-main); color: white; padding: 5px 14px; border-radius: 3px; margin-bottom: 30px; align-self: flex-start;">15TB Archive</div>
                 <ul style="list-style: none; padding: 0; margin-bottom: 40px; color: var(--text-sub); font-size: 0.95rem;">
+                    <li style="margin-bottom: 15px;"><i class="fas fa-gauge-high" style="color: var(--accent); margin-right: 12px;"></i> Priority Unlimited Bandwidth</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-lock" style="color: var(--accent); margin-right: 12px;"></i> AES-256 Server-Side Encryption</li>
+                    <li style="margin-bottom: 15px;"><i class="fas fa-shield-virus" style="color: var(--accent); margin-right: 12px;"></i> Fragmented Security</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-server" style="color: var(--accent); margin-right: 12px;"></i> Global Node Distro</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-microchip" style="color: var(--accent); margin-right: 12px;"></i> Priority Reassembly</li>
                     <li style="margin-bottom: 15px;"><i class="fas fa-link-slash" style="color: var(--accent); margin-right: 12px;"></i> Anonymous Payment</li>
                 </ul>
-                <a href="#" class="btn js-btc-pay-btn" data-tier="studio" data-plan="Colossus">Deploy Colossus</a>
+                <a href="#" class="btn js-tier-btn js-btc-pay-btn" data-tier="studio" data-plan="Colossus">Deploy Colossus</a>
             </div>
         </div>
 
@@ -627,6 +657,13 @@
         const WORKER_URL = String(window.ARK_WORKER_URL || DEFAULT_WORKER_URL).trim();
         const BTC_WALLET = String(window.ARK_BTC_WALLET || DEFAULT_BTC_WALLET).trim();
         const REDIRECT_DELAY_MS = 500;
+        const GB = 1073741824;
+        const TIER_STORAGE_CAPS = {
+            starter: 50 * GB,
+            pro: 500 * GB,
+            creator: 2 * 1024 * GB,
+            studio: 15 * 1024 * GB,
+        };
         const paymentModal = document.getElementById('btc-payment-modal');
         const paymentForm = document.getElementById('btc-payment-form');
         const paymentWallet = document.getElementById('btc-payment-wallet');
@@ -635,6 +672,7 @@
         const paymentHashInput = document.getElementById('btc-transaction-hash');
         const paymentSubmitBtn = document.getElementById('btc-payment-submit');
         const paymentCancelBtn = document.getElementById('btc-payment-cancel');
+        const tierButtons = Array.from(document.querySelectorAll('.js-tier-btn'));
         const paymentFlow = {
             activeButton: null,
             tierName: '',
@@ -664,6 +702,46 @@
                 throw new Error(data.error || 'Failed to load account session');
             }
             return data;
+        }
+
+        function resolveActiveTierName(user) {
+            const storageCap = Number(user?.storage_cap);
+            if (!Number.isFinite(storageCap)) return '';
+            const activeTier = Object.entries(TIER_STORAGE_CAPS).find(([, limit]) => limit === storageCap);
+            return activeTier ? activeTier[0] : '';
+        }
+
+        function setTierButtonState(button, isActive) {
+            if (!button) return;
+            if (!button.dataset.defaultLabel) button.dataset.defaultLabel = (button.textContent || '').trim();
+            if (!button.dataset.defaultHref) button.dataset.defaultHref = button.getAttribute('href') || '';
+            button.textContent = isActive ? 'Active Slot' : button.dataset.defaultLabel;
+            button.classList.toggle('current', isActive);
+            if (isActive) {
+                button.setAttribute('aria-current', 'true');
+                button.removeAttribute('href');
+            } else {
+                button.removeAttribute('aria-current');
+                if (button.dataset.defaultHref) button.setAttribute('href', button.dataset.defaultHref);
+            }
+            button.tabIndex = 0;
+        }
+
+        async function syncTierButtons() {
+            const token = localStorage.getItem('jwork_token');
+            if (!token) {
+                tierButtons.forEach((button) => setTierButtonState(button, false));
+                return;
+            }
+            try {
+                const user = await fetchCurrentUser(token);
+                const activeTier = resolveActiveTierName(user);
+                tierButtons.forEach((button) => {
+                    setTierButtonState(button, button.dataset.tier === activeTier);
+                });
+            } catch (_err) {
+                tierButtons.forEach((button) => setTierButtonState(button, false));
+            }
         }
 
         async function submitBtcVerification(token, userId, tierName, transactionHash) {
@@ -730,6 +808,7 @@
         async function handleBtcPayment(event) {
             event.preventDefault();
             const btn = event.currentTarget;
+            if (btn.classList.contains('current')) return;
             const tierName = String(btn.dataset.tier || '').trim();
             const planName = String(btn.dataset.plan || tierName || 'tier').trim();
             if (!tierName) return;
@@ -745,6 +824,13 @@
             if (event.key !== 'Escape') return;
             lockPaymentButton(paymentFlow.activeButton, false);
             closePaymentModal();
+        }
+
+        function handleStarterDeployment(event) {
+            event.preventDefault();
+            if (event.currentTarget.classList.contains('current')) return;
+            const token = localStorage.getItem('jwork_token');
+            window.location.href = token ? '/dash/' : '/auth/';
         }
 
         paymentForm.addEventListener('submit', async (event) => {
@@ -780,9 +866,13 @@
                 closePaymentModal();
             }
         });
+        document.querySelectorAll('.js-starter-btn').forEach((btn) => {
+            btn.addEventListener('click', handleStarterDeployment);
+        });
         document.querySelectorAll('.js-btc-pay-btn').forEach((btn) => {
             btn.addEventListener('click', handleBtcPayment);
         });
+        syncTierButtons();
     </script>
 
 </body>
