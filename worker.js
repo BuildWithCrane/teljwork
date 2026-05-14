@@ -708,13 +708,21 @@ function normalizePaymentCurrency(currency) {
   return ['BTC', 'LTC', 'XMR'].includes(value) ? value : '';
 }
 
+// FIX 1: lowercase the hash so mixed-case input from the frontend doesn't
+// cause mempool.space / blockchair to reject it with HTTP 400.
 function normalizeTransactionHash(transactionHash) {
-  return String(transactionHash || '').trim();
+  return String(transactionHash || '').trim().toLowerCase();
+}
+
+// FIX 2: validate the hash is a proper 64-char hex string before hitting
+// any external API or writing anything to the database.
+function isValidTransactionHash(hash) {
+  return typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash);
 }
 
 function isTestModeBypassHash(transactionHash, env) {
   const enabled = String(env?.ENABLE_TEST_MODE || '').toLowerCase() === 'true'; // REMOVE BEFORE GOING LIVE
-  return enabled && String(transactionHash || '').trim() === TEST_MODE_BYPASS_HASH;
+  return enabled && String(transactionHash || '').trim().toUpperCase() === TEST_MODE_BYPASS_HASH;
 }
 
 function tierConfigFromEnv(env) {
@@ -776,14 +784,20 @@ function getLtcReceivedAmount(txData, transactionHash, walletAddress) {
   }, 0);
 }
 
+// FIX 3: removed enc() around transactionHash in the URLs — the hash is
+// already validated as pure hex (no special chars), and enc() was
+// percent-encoding characters that caused the APIs to reject the request.
 async function fetchReceivedAmount(currency, transactionHash, walletAddress) {
   if (currency === 'BTC') {
-    const txData = await fetchJsonFromApi(`https://mempool.space/api/tx/${enc(transactionHash)}`, 'Unable to fetch BTC transaction');
+    const txData = await fetchJsonFromApi(
+      `https://mempool.space/api/tx/${transactionHash}`,
+      'Unable to fetch BTC transaction'
+    );
     return getBtcReceivedAmount(txData, walletAddress);
   }
   if (currency === 'LTC') {
     const txData = await fetchJsonFromApi(
-      `https://blockchair.com/litecoin/dashboards/transaction/${enc(transactionHash)}`,
+      `https://blockchair.com/litecoin/dashboards/transaction/${transactionHash}`,
       'Unable to fetch LTC transaction'
     );
     return getLtcReceivedAmount(txData, transactionHash, walletAddress);
@@ -841,9 +855,18 @@ async function verifyPayment(request, env) {
   const tierName = String(body.tierName || '').trim();
   const currency = normalizePaymentCurrency(body.currency);
   const transactionHash = normalizeTransactionHash(body.transactionHash);
+
   if (!userId || !tierName || !currency || !transactionHash) {
     return jsonError('userId, tierName, currency, and transactionHash are required', 400, 'missing_payment_fields');
   }
+
+  // FIX 2 (applied): reject malformed hashes before touching the DB or any external API.
+  // The test mode bypass hash is intentionally not a valid hex string, so skip validation for it.
+  const isBypass = isTestModeBypassHash(transactionHash, env); // REMOVE BEFORE GOING LIVE
+  if (!isBypass && !isValidTransactionHash(transactionHash)) {
+    return jsonError('Invalid transaction hash — must be a 64-character hex string', 400, 'invalid_transaction_hash');
+  }
+
   if (auth.userId !== userId) return jsonError('Forbidden', 403, 'forbidden');
 
   const duplicateError = await ensurePaymentNotProcessed(env, transactionHash);
@@ -861,8 +884,8 @@ async function verifyPayment(request, env) {
   if (!claimed) return jsonError('Transaction hash already processed', 409, 'transaction_already_processed');
 
   // ===== TEST MODE BYPASS (REMOVE BEFORE GOING LIVE) =====
-  if (isTestModeBypassHash(transactionHash, env)) {
-    const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+  if (isBypass) {
+    const updatedProfile = await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_cap: tier.storageLimit });
     if (!updatedProfile.length) {
       await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
       return jsonError('Profile not found', 404, 'profile_not_found');
@@ -908,7 +931,7 @@ async function verifyPayment(request, env) {
     return jsonError('Payment amount or wallet output does not match tier price', 400, 'payment_not_verified');
   }
 
-  const updatedProfile = await sbPatch(env, `profiles?id=eq.${enc(userId)}`, { storage_limit: tier.storageLimit });
+  const updatedProfile = await sbPatch(env, `users?id=eq.${enc(userId)}`, { storage_cap: tier.storageLimit });
   if (!updatedProfile.length) {
     await sbPatch(env, `payments?transaction_hash=eq.${enc(transactionHash)}`, { status: 'failed_profile_not_found' });
     return jsonError('Profile not found', 404, 'profile_not_found');
@@ -1256,6 +1279,7 @@ export const __testables = {
   safeEqual,
   normalizePaymentCurrency,
   normalizeTransactionHash,
+  isValidTransactionHash,
   isTestModeBypassHash,
   resolveTierConfig,
   getBtcReceivedAmount,
