@@ -61,9 +61,13 @@ test('payment helpers normalize currency and hash input', () => {
 
 test('resolveTierConfig uses defaults and validates unknown tiers', () => {
   const pro = __testables.resolveTierConfig({}, 'Pro');
+  const studio = __testables.resolveTierConfig({}, 'studio');
   assert.equal(pro.name, 'pro');
   assert.equal(pro.priceEur, 1.99);
   assert.equal(pro.storageLimit, 250 * 1073741824);
+  assert.equal(studio.name, 'studio');
+  assert.equal(studio.priceEur, 14.99);
+  assert.equal(studio.storageLimit, 15 * 1024 * 1073741824);
   assert.equal(__testables.resolveTierConfig({}, 'unknown'), null);
 });
 
