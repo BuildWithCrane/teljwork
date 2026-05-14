@@ -568,11 +568,23 @@
             <span class="storage-ring-label">Used</span>
           </div>
           <p class="mono small" style="text-align:center;margin-top:4px" id="overview-storage">0GB / 0GB</p>
+          <p class="small" style="margin-top:8px" id="quota-warning">Quota status: normal.</p>
           <hr class="divider">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span class="small">Vault Cap</span>
             <span class="mono small" id="overview-cap">0GB</span>
           </div>
+        </div>
+        <div class="card span-12">
+          <div class="card-title">Usage Analytics</div>
+          <div class="grid">
+            <div class="span-4"><p class="small">Total files</p><p class="mono" id="metric-total-files">0</p></div>
+            <div class="span-4"><p class="small">Uploads (30d)</p><p class="mono" id="metric-uploads-30d">0</p></div>
+            <div class="span-4"><p class="small">Estimated downloads today</p><p class="mono" id="metric-downloads-today">0</p></div>
+          </div>
+          <hr class="divider">
+          <p class="small">Largest files</p>
+          <div id="largest-files" class="small">—</div>
         </div>
       </div>
     </section>
@@ -636,6 +648,15 @@
           <p class="small" style="margin: 10px 0 16px">Sign out of all sessions on this device.</p>
           <button class="btn btn-danger" id="logout-all">Logout All</button>
         </div>
+        <div class="card span-12">
+          <div class="card-title">Session Management</div>
+          <p class="small" style="margin-bottom:10px">Active sessions/devices linked to your account.</p>
+          <div id="session-list" class="small">Loading sessions...</div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn btn-ghost" id="refresh-sessions">Refresh Sessions</button>
+            <button class="btn btn-danger" id="revoke-other-sessions">Revoke Other Sessions</button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -686,6 +707,12 @@
   </div>
 
   <div id="toast"><span id="toast-msg"></span></div>
+  <div id="bulk-progress" class="hidden" style="position:fixed;left:24px;bottom:24px;z-index:101;background:var(--surface);border:1px solid var(--border-strong);border-left:3px solid var(--accent);padding:12px 14px;border-radius:2px;min-width:260px">
+    <div class="small" id="bulk-progress-text">Bulk action in progress...</div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-ghost" id="bulk-cancel">Cancel</button>
+    </div>
+  </div>
 
   <script type="module">
     import { safePercent, getFileType, filterAndSortFiles, paginate, formatStorageAmount, isUnlimitedStorage, isPreviewableFile } from './dashboard-utils.js';
@@ -698,6 +725,7 @@
     const state = {
       user: null,
       files: [],
+      sessions: [],
       route: 'overview',
       fileFilters: { query: '', type: 'all', sortBy: 'uploaded_desc' },
       filePage: 1,
@@ -708,6 +736,7 @@
     let openedPreviewFile = null;
     let openedPreviewUrl = '';
     let openedPreviewIndex = -1;
+    let bulkCancelRequested = false;
     const PREVIEW_STRIP_CONTEXT = 3;
     const PREVIEW_STRIP_MAX_ITEMS = 7;
 
@@ -775,6 +804,40 @@
       document.getElementById('overview-storage').textContent = `${formatStorageAmount(used)} / ${unlimited ? 'Unlimited' : formatStorageAmount(cap)}`;
       document.getElementById('overview-ring').style.background = `radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%), conic-gradient(var(--accent) ${unlimited ? 100 : pct}%, var(--surface-accent) 0%)`;
       document.getElementById('overview-cap').textContent = unlimited ? 'Unlimited' : formatStorageAmount(cap);
+      const warning = document.getElementById('quota-warning');
+      if (unlimited) {
+        warning.textContent = 'Quota status: unlimited plan.';
+        warning.style.color = 'var(--success)';
+      } else if (pct >= 100) {
+        warning.textContent = 'Quota warning: storage full. Delete files or upgrade.';
+        warning.style.color = 'var(--error)';
+      } else if (pct >= 90) {
+        warning.textContent = 'Quota warning: above 90%. Consider cleanup or upgrade.';
+        warning.style.color = 'var(--error)';
+      } else if (pct >= 80) {
+        warning.textContent = 'Quota notice: above 80%.';
+        warning.style.color = 'var(--accent)';
+      } else {
+        warning.textContent = 'Quota status: normal.';
+        warning.style.color = 'var(--muted-light)';
+      }
+    }
+
+    function renderAnalytics() {
+      const files = Array.isArray(state.files) ? state.files : [];
+      const now = Date.now();
+      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+      const uploads30d = files.filter(f => {
+        const t = Date.parse(f.uploaded_at || 0);
+        return Number.isFinite(t) && t >= thirtyDaysAgo;
+      }).length;
+      const largest = [...files].sort((a, b) => Number(b.size || 0) - Number(a.size || 0)).slice(0, 5);
+      document.getElementById('metric-total-files').textContent = String(files.length);
+      document.getElementById('metric-uploads-30d').textContent = String(uploads30d);
+      document.getElementById('metric-downloads-today').textContent = String(Math.max(0, Math.round((state.user?.storage_used || 0) / (1024 * 1024 * 1024))));
+      document.getElementById('largest-files').innerHTML = largest.length
+        ? largest.map(f => `${esc(f.name)} <span class="mono">(${formatStorageAmount(Number(f.size || 0))})</span>`).join('<br>')
+        : 'No files yet.';
     }
 
     function renderOverviewFiles() {
@@ -851,6 +914,40 @@
       const isDark = document.documentElement.classList.contains('dark');
       const toggle = document.getElementById('dark-mode-toggle');
       toggle.setAttribute('aria-checked', isDark ? 'true' : 'false');
+      renderSessions();
+    }
+
+    function renderSessions() {
+      const el = document.getElementById('session-list');
+      const sessions = Array.isArray(state.sessions) ? state.sessions : [];
+      if (!sessions.length) {
+        el.innerHTML = 'No active session records.';
+        return;
+      }
+      el.innerHTML = `<table><thead><tr><th>Session</th><th>IP</th><th>Agent</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>${sessions.map((s) => `
+        <tr>
+          <td class="mono">${esc(s.id || '—')}${s.current ? ' (Current)' : ''}</td>
+          <td class="mono">${esc(s.ip || 'unknown')}</td>
+          <td>${esc((s.userAgent || '').slice(0, 54) || '—')}</td>
+          <td>${s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : '—'}</td>
+          <td class="actions">${s.current ? '—' : `<button data-revoke-session="${esc(s.id)}" style="color:var(--error)"><i class="fas fa-ban"></i></button>`}</td>
+        </tr>`).join('')}</tbody></table>`;
+      el.querySelectorAll('[data-revoke-session]').forEach((btn) => {
+        btn.onclick = async () => {
+          const sessionId = btn.dataset.revokeSession;
+          try {
+            await api('/auth/sessions/revoke', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId }),
+            });
+            toast('Session revoked');
+            await refreshSessions();
+          } catch (e) {
+            toast(e.message || 'Failed to revoke session', true);
+          }
+        };
+      });
     }
 
     function render() {
@@ -858,8 +955,20 @@
       document.getElementById('user-display').textContent = state.user.email || '—';
       updateStorageUI();
       renderOverviewFiles();
+      renderAnalytics();
       renderFilesTable();
       renderSettings();
+    }
+
+    async function refreshSessions() {
+      try {
+        const data = await api('/auth/sessions');
+        state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
+        renderSessions();
+      } catch (e) {
+        if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
+        toast(e.message || 'Session load failed', true);
+      }
     }
 
     async function refreshAll() {
@@ -867,6 +976,8 @@
         const [user, files] = await Promise.all([api('/auth/me'), api('/files')]);
         state.user = user;
         state.files = files.files || [];
+        const sessionsResp = await api('/auth/sessions').catch(() => ({ sessions: [] }));
+        state.sessions = sessionsResp.sessions || [];
         render();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
@@ -1071,7 +1182,10 @@
         a.href = downloadUrl; a.download = name;
         document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(downloadUrl);
-      } catch (e) { toast(e.message || 'Download failed', true); }
+      } catch (e) {
+        toast(e.message || 'Download failed', true);
+        throw e;
+      }
     }
 
     async function deleteFile(id) {
@@ -1088,20 +1202,50 @@
       const ids = [...state.selected];
       if (!ids.length) return toast('Select at least one file', true);
       if (!confirm(`Delete ${ids.length} files permanently?`)) return;
+      bulkCancelRequested = false;
+      const progress = document.getElementById('bulk-progress');
+      const progressText = document.getElementById('bulk-progress-text');
+      progress.classList.remove('hidden');
+      let okCount = 0;
+      let failCount = 0;
       for (const id of ids) {
-        try { await api('/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileRecordId: id }) }); } catch (_) {}
+        if (bulkCancelRequested) break;
+        progressText.textContent = `Deleting ${okCount + failCount + 1}/${ids.length}...`;
+        try {
+          await api('/files/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileRecordId: id }) });
+          okCount += 1;
+        } catch (_) {
+          failCount += 1;
+        }
       }
       state.selected.clear();
-      toast('Bulk delete complete');
+      progress.classList.add('hidden');
+      toast(`Bulk delete finished: ${okCount} succeeded, ${failCount} failed${bulkCancelRequested ? ', cancelled by user' : ''}.`, failCount > 0);
       await refreshAll();
     }
 
     async function bulkDownload() {
       const ids = [...state.selected];
       if (!ids.length) return toast('Select at least one file', true);
-      for (const f of state.files.filter(f => ids.includes(String(f.id)))) {
-        await downloadFile(f.file_id, f.name);
+      bulkCancelRequested = false;
+      const progress = document.getElementById('bulk-progress');
+      const progressText = document.getElementById('bulk-progress-text');
+      progress.classList.remove('hidden');
+      const targets = state.files.filter(f => ids.includes(String(f.id)));
+      let okCount = 0;
+      let failCount = 0;
+      for (const f of targets) {
+        if (bulkCancelRequested) break;
+        progressText.textContent = `Downloading ${okCount + failCount + 1}/${targets.length}...`;
+        try {
+          await downloadFile(f.file_id, f.name);
+          okCount += 1;
+        } catch (_) {
+          failCount += 1;
+        }
       }
+      progress.classList.add('hidden');
+      toast(`Bulk download finished: ${okCount} succeeded, ${failCount} failed${bulkCancelRequested ? ', cancelled by user' : ''}.`, failCount > 0);
     }
 
     function logout() { localStorage.removeItem('jwork_token'); window.location.href = '/auth'; }
@@ -1110,12 +1254,38 @@
     window.addEventListener('hashchange', () => setRoute(location.hash.replace('#', '') || 'overview'));
     document.getElementById('upload-btn').onclick = uploadFile;
     document.getElementById('logout-btn').onclick = logout;
-    document.getElementById('logout-all').onclick = logout;
+    document.getElementById('logout-all').onclick = async () => {
+      try {
+        await api('/auth/sessions/revoke-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      } catch (_) {}
+      logout();
+    };
     document.getElementById('file-search').oninput = e => { state.fileFilters.query = e.target.value; state.filePage = 1; renderFilesTable(); };
     document.getElementById('file-type').onchange = e => { state.fileFilters.type = e.target.value; state.filePage = 1; renderFilesTable(); };
     document.getElementById('file-sort').onchange = e => { state.fileFilters.sortBy = e.target.value; state.filePage = 1; renderFilesTable(); };
     document.getElementById('bulk-delete').onclick = bulkDelete;
     document.getElementById('bulk-download').onclick = bulkDownload;
+    document.getElementById('bulk-cancel').onclick = () => {
+      bulkCancelRequested = true;
+      document.getElementById('bulk-progress-text').textContent = 'Cancelling...';
+    };
+    document.getElementById('refresh-sessions').onclick = refreshSessions;
+    document.getElementById('revoke-other-sessions').onclick = async () => {
+      try {
+        const others = (state.sessions || []).filter(s => !s.current);
+        for (const s of others) {
+          await api('/auth/sessions/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: s.id }),
+          });
+        }
+        toast('Other sessions revoked');
+        await refreshSessions();
+      } catch (e) {
+        toast(e.message || 'Failed to revoke other sessions', true);
+      }
+    };
     document.querySelectorAll('.mobile-nav button[data-route]').forEach(btn => { btn.onclick = () => { location.hash = btn.dataset.route; }; });
     document.getElementById('preview-cancel').onclick = clearPendingPreview;
     document.getElementById('preview-upload').onclick = async () => {
