@@ -20,6 +20,13 @@ const EXTERNAL_API_RETRIES = 1;
 const RATE_CACHE_TTL_MS = 60000;
 const RATE_CACHE = new Map();
 const EXTERNAL_ERROR_BODY_MAX_LENGTH = 240;
+const DAILY_BANDWIDTH_LIMITS = {
+  starter: 10 * GB,
+  pro: 100 * GB,
+  creator: UNLIMITED_STORAGE_CAP,
+  studio: UNLIMITED_STORAGE_CAP,
+};
+const BANDWIDTH_USAGE_CACHE = new Map();
 const TEST_MODE_BYPASS_HASH = 'ARK_TEST_BYPASS'; // REMOVE BEFORE GOING LIVE
 const PAYMENT_WALLETS = {
   BTC: 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc',
@@ -1015,6 +1022,54 @@ async function uploadFile(request, env) {
   return jsonOk({ file: saved[0] });
 }
 
+function currentUtcDayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getDailyBandwidthCapBytes(storageCapBytes) {
+  const cap = Number(storageCapBytes);
+  if (cap < 0) return DAILY_BANDWIDTH_LIMITS.studio;
+  if (!Number.isFinite(cap) || cap === 0) return DAILY_BANDWIDTH_LIMITS.starter;
+  if (cap >= DEFAULT_TIER_CONFIG.creator.storageLimit) return DAILY_BANDWIDTH_LIMITS.creator;
+  if (cap >= DEFAULT_TIER_CONFIG.pro.storageLimit) return DAILY_BANDWIDTH_LIMITS.pro;
+  return DAILY_BANDWIDTH_LIMITS.starter;
+}
+
+function cleanupBandwidthUsageCache(dayKey) {
+  for (const key of BANDWIDTH_USAGE_CACHE.keys()) {
+    if (!key.endsWith(`:${dayKey}`)) BANDWIDTH_USAGE_CACHE.delete(key);
+  }
+}
+
+function consumeDailyBandwidth(userId, storageCapBytes, transferBytes) {
+  const bytes = Math.max(0, Math.round(Number(transferBytes)));
+  const capBytes = getDailyBandwidthCapBytes(storageCapBytes);
+  if (capBytes < 0) return { allowed: true };
+
+  const dayKey = currentUtcDayKey();
+  cleanupBandwidthUsageCache(dayKey);
+  const usageKey = `${String(userId)}:${dayKey}`;
+  const used = Number(BANDWIDTH_USAGE_CACHE.get(usageKey) || 0);
+  if (!bytes) return { allowed: true, limitBytes: capBytes, usedBytes: used };
+  const attemptedUsedBytes = used + bytes;
+  if (attemptedUsedBytes > capBytes) {
+    return { allowed: false, limitBytes: capBytes, usedBytes: used, attemptedUsedBytes, requestedBytes: bytes };
+  }
+
+  BANDWIDTH_USAGE_CACHE.set(usageKey, attemptedUsedBytes);
+  return { allowed: true, limitBytes: capBytes, usedBytes: attemptedUsedBytes };
+}
+
+async function enforceDailyBandwidthLimit(env, userId, transferBytes) {
+  const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,storage_cap`);
+  if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  const usage = consumeDailyBandwidth(userId, users[0].storage_cap, transferBytes);
+  if (!usage.allowed) {
+    return jsonError('Daily bandwidth limit reached for your current tier', 429, 'bandwidth_limit_reached');
+  }
+  return null;
+}
+
 async function listFiles(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
@@ -1030,9 +1085,11 @@ async function downloadFile(request, env) {
   const fileId = searchParams.get('fileId');
   if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
 
-  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type,size`);
   if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
   const file = files[0];
+  const bandwidthError = await enforceDailyBandwidthLimit(env, auth.userId, file.size);
+  if (bandwidthError) return bandwidthError;
 
   const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getFile?file_id=${encodeURIComponent(fileId)}`);
   const tgData = await tgRes.json();
@@ -1061,10 +1118,12 @@ async function viewFile(request, env) {
   const fileId = searchParams.get('fileId');
   if (!fileId) return jsonError('fileId required', 400, 'missing_file_id');
 
-  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type`);
+  const files = await sbGet(env, `files?file_id=eq.${enc(fileId)}&user_id=eq.${auth.userId}&select=id,name,type,size`);
   if (files.length === 0) return jsonError('Access denied', 404, 'file_not_found');
   const file = files[0];
   if (!isPreviewableMediaFile(file)) return jsonError('File type cannot be previewed', 415, 'preview_not_supported');
+  const bandwidthError = await enforceDailyBandwidthLimit(env, auth.userId, file.size);
+  if (bandwidthError) return bandwidthError;
 
   const tgRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(env.BOT_TOKEN)}/getFile?file_id=${encodeURIComponent(fileId)}`);
   const tgData = await tgRes.json();
@@ -1284,6 +1343,8 @@ export const __testables = {
   resolveTierConfig,
   getBtcReceivedAmount,
   getLtcReceivedAmount,
+  getDailyBandwidthCapBytes,
+  consumeDailyBandwidth,
   isPreviewableMediaFile,
   guessPreviewContentType,
   isPreviewContentType,
