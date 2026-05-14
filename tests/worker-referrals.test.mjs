@@ -86,6 +86,24 @@ test('resolveTierConfig supports PAYMENT_TIER_CONFIG overrides', () => {
   assert.deepEqual(gold, { name: 'gold', priceEur: 7.5, storageLimit: 777 });
 });
 
+test('bandwidth helpers map storage caps to daily limits and block excess usage', () => {
+  const GB = 1073741824;
+  assert.equal(__testables.getDailyBandwidthCapBytes(50 * GB), 10 * GB);
+  assert.equal(__testables.getDailyBandwidthCapBytes(500 * GB), 100 * GB);
+  assert.equal(__testables.getDailyBandwidthCapBytes(2 * 1024 * GB), -1);
+  assert.equal(__testables.getDailyBandwidthCapBytes(-1), -1);
+
+  const userId = `bandwidth-test-${Date.now()}`;
+  const first = __testables.consumeDailyBandwidth(userId, 500 * GB, 60 * GB);
+  assert.equal(first.allowed, true);
+
+  const second = __testables.consumeDailyBandwidth(userId, 500 * GB, 40 * GB);
+  assert.equal(second.allowed, true);
+
+  const third = __testables.consumeDailyBandwidth(userId, 500 * GB, 1);
+  assert.equal(third.allowed, false);
+});
+
 test('BTC and LTC amount helpers sum outputs to configured wallet', () => {
   const btcWallet = 'bc1qy0rc5kq9wacgzau7f92wu8ch5ye0aet7c6urhc';
   const ltcWallet = 'ltc1q9casldmsejj9pxsqd5c0222htkq6xqvhvmqnhr';
