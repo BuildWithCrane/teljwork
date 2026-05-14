@@ -716,7 +716,11 @@
             if (!button.dataset.defaultLabel) button.dataset.defaultLabel = (button.textContent || '').trim();
             button.textContent = isActive ? 'Active Slot' : button.dataset.defaultLabel;
             button.classList.toggle('current', isActive);
-            button.setAttribute('aria-disabled', String(isActive));
+            if (isActive) {
+                button.setAttribute('aria-current', 'true');
+            } else {
+                button.removeAttribute('aria-current');
+            }
             button.tabIndex = isActive ? -1 : 0;
         }
 
