@@ -302,8 +302,8 @@
 
         .btn.disabled,
         .btn.current {
-            background: #f0f0f0;
-            color: #aaa;
+            background: #E0E0E0;
+            color: #A0A0A0;
             pointer-events: none;
         }
 
@@ -720,11 +720,12 @@
             if (isActive) {
                 button.setAttribute('aria-current', 'true');
                 button.removeAttribute('href');
+                button.tabIndex = -1;
             } else {
                 button.removeAttribute('aria-current');
                 if (button.dataset.defaultHref) button.setAttribute('href', button.dataset.defaultHref);
+                button.tabIndex = 0;
             }
-            button.tabIndex = 0;
         }
 
         async function syncTierButtons() {

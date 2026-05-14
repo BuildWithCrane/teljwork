@@ -266,7 +266,7 @@
             
             <div class="info-box">
                 <strong><i class="fas fa-clock"></i> Expected Latency:</strong> 
-                Standard retrieval usually completes within 1-3 minutes depending on payload size and network traffic. During that reassembly window, higher-tier Vault/Monolith slots (Pro/Creator) receive bandwidth preference over lower-priority traffic.
+                Standard retrieval usually completes within 1-3 minutes depending on payload size and network traffic. During that reassembly window, <strong>Monolith and Colossus</strong> tier slots receive bandwidth preference over lower-priority traffic.
             </div>
         </section>
 
@@ -302,6 +302,11 @@
                 <strong><i class="fa-solid fa-shield-halved"></i> Privacy Note:</strong> 
                 Because we use the Transaction Hash as your receipt, ARK never requires your name, billing address, or banking details. Your storage is linked only to your Vault ID.
             </div>
+
+            <div class="info-box" style="background: #fff8f2; border-left-color: var(--accent);">
+                <strong><i class="fa-solid fa-triangle-exclamation"></i> Monero (XMR) Manual Verification:</strong> 
+                Payments made in Monero require manual verification due to the privacy-preserving nature of the XMR blockchain. Please allow additional processing time when using XMR. Submit your transaction ID through the activation terminal and our team will confirm the payment manually.
+            </div>
         </section>
 
         <section id="limits">
@@ -325,7 +330,7 @@
                     </tr>
                     <tr>
                         <td style="padding: 15px; border: 1px solid var(--border);">Max File Size</td>
-                        <td style="padding: 15px; border: 1px solid var(--border);">2,048 MB (2GB)</td>
+                        <td style="padding: 15px; border: 1px solid var(--border);">2GB Industrial Limit</td>
                     </tr>
                     <tr>
                         <td style="padding: 15px; border: 1px solid var(--border);">Daily Bandwidth</td>
@@ -333,7 +338,11 @@
                     </tr>
                     <tr>
                         <td style="padding: 15px; border: 1px solid var(--border);">Encryption</td>
-                        <td style="padding: 15px; border: 1px solid var(--border);">AES-256 (Server-Side)</td>
+                        <td style="padding: 15px; border: 1px solid var(--border);">AES-256 Server-Side Encryption</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 15px; border: 1px solid var(--border);">Security Model</td>
+                        <td style="padding: 15px; border: 1px solid var(--border);">Fragmented Security (Standard)</td>
                     </tr>
                 </table>
             </div>
