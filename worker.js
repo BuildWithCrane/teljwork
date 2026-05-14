@@ -28,9 +28,9 @@ const PAYMENT_WALLETS = {
 };
 const DEFAULT_TIER_CONFIG = {
   starter: { priceEur: 0, storageLimit: 50 * GB },
-  pro: { priceEur: 1.99, storageLimit: 250 * GB },
-  creator: { priceEur: 4.99, storageLimit: 1024 * GB },
-  studio: { priceEur: 14.99, storageLimit: 5 * 1024 * GB },
+  pro: { priceEur: 2.5, storageLimit: 500 * GB },
+  creator: { priceEur: 9, storageLimit: 2 * 1024 * GB },
+  studio: { priceEur: 35, storageLimit: 15 * 1024 * GB },
 };
 
 export default {
