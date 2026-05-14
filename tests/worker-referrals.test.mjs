@@ -92,8 +92,16 @@ test('bandwidth helpers map storage caps to daily limits and block excess usage'
   assert.equal(__testables.getDailyBandwidthCapBytes(500 * GB), 100 * GB);
   assert.equal(__testables.getDailyBandwidthCapBytes(2 * 1024 * GB), -1);
   assert.equal(__testables.getDailyBandwidthCapBytes(-1), -1);
+  assert.equal(__testables.getDailyBandwidthCapBytes(0), 10 * GB);
+  assert.equal(__testables.getDailyBandwidthCapBytes('invalid'), 10 * GB);
+  assert.equal(__testables.getDailyBandwidthCapBytes(Number.POSITIVE_INFINITY), 10 * GB);
 
   const userId = `bandwidth-test-${Date.now()}`;
+  const zero = __testables.consumeDailyBandwidth(userId, 500 * GB, 0);
+  assert.equal(zero.allowed, true);
+  assert.equal(zero.limitBytes, 100 * GB);
+  assert.equal(zero.usedBytes, 0);
+
   const first = __testables.consumeDailyBandwidth(userId, 500 * GB, 60 * GB);
   assert.equal(first.allowed, true);
 
