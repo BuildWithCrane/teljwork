@@ -784,9 +784,12 @@
       const { notify = true } = options;
       const disabledMsg = typeof message === 'string' && message.trim() ? message : ACCOUNT_DISABLED_FALLBACK;
       const notice = document.getElementById('account-disabled-notice');
-      notice.textContent = disabledMsg;
-      notice.classList.remove('hidden');
-      document.getElementById('user-display').textContent = 'Account Disabled';
+      if (notice) {
+        notice.textContent = disabledMsg;
+        notice.classList.remove('hidden');
+      }
+      const userDisplay = document.getElementById('user-display');
+      if (userDisplay) userDisplay.textContent = 'Account Disabled';
       if (notify) toast(disabledMsg, true, { persist: true });
     }
 
@@ -809,7 +812,7 @@
         return data;
       } catch (e) {
         if (retries > 0) return api(path, opts, retries - 1);
-        if (isAccountDisabledError(e)) showAccountDisabledWarning(e.message);
+        if (isAccountDisabledError(e)) showAccountDisabledWarning(e?.message || e?.error || '');
         throw e;
       }
     }
