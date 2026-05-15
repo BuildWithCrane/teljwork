@@ -736,6 +736,7 @@
 
     const WORKER_URL = 'https://sparkling-math-0017.wgattr14.workers.dev';
     const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+    const ACCOUNT_DISABLED_FALLBACK = 'Account is temporarily disabled by admin.';
     const state = {
       user: null,
       files: [],
@@ -998,10 +999,10 @@
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
         if (e.code === 'account_disabled') {
           const notice = document.getElementById('account-disabled-notice');
-          notice.textContent = e.message || 'Account is temporarily disabled by admin.';
+          notice.textContent = e.message || ACCOUNT_DISABLED_FALLBACK;
           notice.classList.remove('hidden');
           document.getElementById('user-display').textContent = 'Account Disabled';
-          return toast(e.message || 'Account is temporarily disabled by admin.', true, { persist: true });
+          return toast(e.message || ACCOUNT_DISABLED_FALLBACK, true, { persist: true });
         }
         toast(e.message || 'Dashboard load failed', true);
       }
