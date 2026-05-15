@@ -805,7 +805,8 @@
         return data;
       } catch (e) {
         if (retries > 0) return api(path, opts, retries - 1);
-        if (e?.code === 'account_disabled') showAccountDisabledWarning(e.message);
+        const isAccountDisabled = e && typeof e === 'object' && e.code === 'account_disabled';
+        if (isAccountDisabled) showAccountDisabledWarning(e.message);
         throw e;
       }
     }
@@ -993,7 +994,7 @@
         renderSessions();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
-        if (e.code === 'account_disabled') return showAccountDisabledWarning(e.message, { notify: false });
+        if (e && typeof e === 'object' && e.code === 'account_disabled') return;
         toast(e.message || 'Session load failed', true);
       }
     }
@@ -1009,10 +1010,7 @@
         render();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
-        if (e.code === 'account_disabled') {
-          showAccountDisabledWarning(e.message, { notify: false });
-          return;
-        }
+        if (e && typeof e === 'object' && e.code === 'account_disabled') return;
         toast(e.message || 'Dashboard load failed', true);
       }
     }
