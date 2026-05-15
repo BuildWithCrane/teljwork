@@ -998,11 +998,12 @@
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
         if (e.code === 'account_disabled') {
+          const disabledMsg = e.message || ACCOUNT_DISABLED_FALLBACK;
           const notice = document.getElementById('account-disabled-notice');
-          notice.textContent = e.message || ACCOUNT_DISABLED_FALLBACK;
+          notice.textContent = disabledMsg;
           notice.classList.remove('hidden');
           document.getElementById('user-display').textContent = 'Account Disabled';
-          return toast(e.message || ACCOUNT_DISABLED_FALLBACK, true, { persist: true });
+          return toast(disabledMsg, true, { persist: true });
         }
         toast(e.message || 'Dashboard load failed', true);
       }
