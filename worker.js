@@ -31,8 +31,10 @@ const ADMIN_LOCKOUTS = new Map();
 const ADMIN_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ADMIN_MAX_FAILED_ATTEMPTS = 8;
 const ADMIN_LOCKOUT_MS = 20 * 60 * 1000;
+const MAX_DISABLED_REASON_LENGTH = 200;
 const SOFT_DISABLED_USERS = new Map();
 const USER_DISABLE_COLUMNS_SUPPORT = { checked: false, available: false };
+let userDisableColumnsSupportCheckPromise = null;
 const SESSION_STORE = new Map();
 const REVOKED_SESSION_IDS = new Set();
 const DAILY_BANDWIDTH_LIMITS = {
@@ -667,7 +669,7 @@ async function adminDisableUser(request, env) {
   if (adminError) return adminError;
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
-  const reason = String(body.reason || '').trim().slice(0, 200) || 'Disabled by admin';
+  const reason = String(body.reason || '').trim().slice(0, MAX_DISABLED_REASON_LENGTH) || 'Disabled by admin';
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
@@ -1437,7 +1439,8 @@ function clearSessionsForUser(userId) {
 
 function normalizeDisabledValue(value) {
   if (value === true || value === 1) return true;
-  if (typeof value === 'string') return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase());
+  if (value === false || value === 0) return false;
+  if (typeof value === 'string') return ['true', '1'].includes(value.trim().toLowerCase());
   return false;
 }
 
@@ -1464,21 +1467,25 @@ function resolveDisabledStateFromUserRecord(userId, userRecord) {
 
 async function hasPersistentUserDisableColumns(env) {
   if (USER_DISABLE_COLUMNS_SUPPORT.checked) return USER_DISABLE_COLUMNS_SUPPORT.available;
-  try {
-    await sbGet(env, 'users?select=disabled,disabled_reason&limit=1');
-    USER_DISABLE_COLUMNS_SUPPORT.available = true;
-  } catch {
-    USER_DISABLE_COLUMNS_SUPPORT.available = false;
-  }
-  USER_DISABLE_COLUMNS_SUPPORT.checked = true;
-  return USER_DISABLE_COLUMNS_SUPPORT.available;
+  if (userDisableColumnsSupportCheckPromise) return userDisableColumnsSupportCheckPromise;
+  userDisableColumnsSupportCheckPromise = (async () => {
+    try {
+      await sbGet(env, 'users?select=disabled,disabled_reason&limit=1');
+      USER_DISABLE_COLUMNS_SUPPORT.available = true;
+    } catch {
+      USER_DISABLE_COLUMNS_SUPPORT.available = false;
+    }
+    USER_DISABLE_COLUMNS_SUPPORT.checked = true;
+    userDisableColumnsSupportCheckPromise = null;
+    return USER_DISABLE_COLUMNS_SUPPORT.available;
+  })();
+  return userDisableColumnsSupportCheckPromise;
 }
 
 async function getUserDisabledState(env, userId, userRecord = null) {
   const key = String(userId);
-  if (userRecord) {
-    const fromRecord = resolveDisabledStateFromUserRecord(key, userRecord);
-    if (Object.prototype.hasOwnProperty.call(userRecord, 'disabled')) return fromRecord;
+  if (userRecord && Object.prototype.hasOwnProperty.call(userRecord, 'disabled')) {
+    return resolveDisabledStateFromUserRecord(key, userRecord);
   }
   if (!(await hasPersistentUserDisableColumns(env))) return resolveDisabledStateFromUserRecord(key, null);
   const users = await sbGet(env, `users?id=eq.${enc(key)}&select=disabled,disabled_reason&limit=1`);
@@ -1488,11 +1495,12 @@ async function getUserDisabledState(env, userId, userRecord = null) {
 
 async function setUserDisabledState(env, userId, disabled, reason = '') {
   const key = String(userId);
-  const normalizedReason = String(reason || '').trim().slice(0, 200);
-  if (await hasPersistentUserDisableColumns(env)) {
+  const normalizedReason = String(reason || '').trim().slice(0, MAX_DISABLED_REASON_LENGTH);
+  const persistentSupported = await hasPersistentUserDisableColumns(env);
+  if (persistentSupported) {
     await sbPatch(env, `users?id=eq.${enc(key)}`, { disabled: Boolean(disabled), disabled_reason: disabled ? normalizedReason : '' });
   }
-  if (disabled) {
+  if (!persistentSupported && disabled) {
     SOFT_DISABLED_USERS.set(key, { reason: normalizedReason || 'Disabled by admin', disabledAt: new Date().toISOString() });
   } else {
     SOFT_DISABLED_USERS.delete(key);
