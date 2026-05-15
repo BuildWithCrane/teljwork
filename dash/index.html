@@ -780,6 +780,16 @@
       if (!persist) toastTimer = setTimeout(() => t.classList.remove('show'), duration);
     }
 
+    function showAccountDisabledWarning(message, options = {}) {
+      const { notify = true } = options;
+      const disabledMsg = String(message || ACCOUNT_DISABLED_FALLBACK);
+      const notice = document.getElementById('account-disabled-notice');
+      notice.textContent = disabledMsg;
+      notice.classList.remove('hidden');
+      document.getElementById('user-display').textContent = 'Account Disabled';
+      if (notify) toast(disabledMsg, true, { persist: true });
+    }
+
     async function api(path, opts = {}, retries = 1) {
       try {
         const res = await fetch(`${WORKER_URL}${path}`, {
@@ -795,6 +805,7 @@
         return data;
       } catch (e) {
         if (retries > 0) return api(path, opts, retries - 1);
+        if (e?.code === 'account_disabled') showAccountDisabledWarning(e.message);
         throw e;
       }
     }
@@ -982,6 +993,7 @@
         renderSessions();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
+        if (e.code === 'account_disabled') return showAccountDisabledWarning(e.message, { notify: false });
         toast(e.message || 'Session load failed', true);
       }
     }
@@ -998,12 +1010,8 @@
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
         if (e.code === 'account_disabled') {
-          const disabledMsg = e.message || ACCOUNT_DISABLED_FALLBACK;
-          const notice = document.getElementById('account-disabled-notice');
-          notice.textContent = disabledMsg;
-          notice.classList.remove('hidden');
-          document.getElementById('user-display').textContent = 'Account Disabled';
-          return toast(disabledMsg, true, { persist: true });
+          showAccountDisabledWarning(e.message, { notify: false });
+          return;
         }
         toast(e.message || 'Dashboard load failed', true);
       }
