@@ -845,7 +845,7 @@ async function login(request, env) {
   const users = await sbGet(env, `users?email=eq.${enc(normalizedEmail)}&select=*`);
   if (!users.length || !(await verifyPassword(password, users[0].password_hash))) return jsonError('Invalid credentials', 401, 'invalid_credentials');
   const user = users[0];
-  if (isUserSoftDisabled(user.id)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  if (isUserSoftDisabled(user.id)) return jsonError(accountDisabledMessage(user.id), 403, 'account_disabled');
   const session = createUserSession(user.id, request);
   const token = await makeJWT({ userId: user.id, email: user.email, sid: session.id }, env.JWT_SECRET);
   return jsonOk({ token, email: user.email, storage_used: user.storage_used, storage_cap: user.storage_cap, session: session.publicView });
@@ -854,7 +854,7 @@ async function login(request, env) {
 async function getMe(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError('Account is temporarily disabled by admin', 403, 'account_disabled');
+  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=*`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
   touchSession(auth.userId, auth.sid, request);
@@ -1423,6 +1423,15 @@ function clearSessionsForUser(userId) {
 
 function isUserSoftDisabled(userId) {
   return SOFT_DISABLED_USERS.has(String(userId));
+}
+
+function getUserSoftDisabledReason(userId) {
+  return isUserSoftDisabled(userId) ? String(SOFT_DISABLED_USERS.get(String(userId))?.reason || '').trim() : '';
+}
+
+function accountDisabledMessage(userId) {
+  const reason = getUserSoftDisabledReason(userId);
+  return reason ? `Account is temporarily disabled by admin. Reason: ${reason}` : 'Account is temporarily disabled by admin';
 }
 
 function getAdminRateKey(request) {

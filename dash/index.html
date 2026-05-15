@@ -189,6 +189,19 @@
       letter-spacing: 1px;
     }
 
+    .account-disabled-notice {
+      margin-bottom: 16px;
+      border: 1px solid var(--error);
+      border-left: 3px solid var(--error);
+      background: rgba(225, 29, 72, .1);
+      color: #fecdd3;
+      padding: 12px 14px;
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      letter-spacing: .8px;
+    }
+
     /* ── GRID ── */
     .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
     .span-8 { grid-column: span 8; }
@@ -550,6 +563,7 @@
       <h1 class="page-title" id="page-title">Overview</h1>
       <div class="user-badge"><span id="user-display">Loading...</span></div>
     </div>
+    <div id="account-disabled-notice" class="account-disabled-notice hidden" role="alert"></div>
 
     <!-- OVERVIEW -->
     <section id="view-overview" class="view">
@@ -974,6 +988,7 @@
     async function refreshAll() {
       try {
         const [user, files] = await Promise.all([api('/auth/me'), api('/files')]);
+        document.getElementById('account-disabled-notice').classList.add('hidden');
         state.user = user;
         state.files = files.files || [];
         const sessionsResp = await api('/auth/sessions').catch(() => ({ sessions: [] }));
@@ -981,6 +996,13 @@
         render();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
+        if (e.code === 'account_disabled') {
+          const notice = document.getElementById('account-disabled-notice');
+          notice.textContent = e.message || 'Account is temporarily disabled by admin.';
+          notice.classList.remove('hidden');
+          document.getElementById('user-display').textContent = 'Account Disabled';
+          return toast(e.message || 'Account is temporarily disabled by admin.', true, { persist: true });
+        }
         toast(e.message || 'Dashboard load failed', true);
       }
     }
