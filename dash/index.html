@@ -782,12 +782,16 @@
 
     function showAccountDisabledWarning(message, options = {}) {
       const { notify = true } = options;
-      const disabledMsg = String(message || ACCOUNT_DISABLED_FALLBACK);
+      const disabledMsg = typeof message === 'string' && message.trim() ? message : ACCOUNT_DISABLED_FALLBACK;
       const notice = document.getElementById('account-disabled-notice');
       notice.textContent = disabledMsg;
       notice.classList.remove('hidden');
       document.getElementById('user-display').textContent = 'Account Disabled';
       if (notify) toast(disabledMsg, true, { persist: true });
+    }
+
+    function isAccountDisabledError(error) {
+      return Boolean(error && typeof error === 'object' && error.code === 'account_disabled');
     }
 
     async function api(path, opts = {}, retries = 1) {
@@ -805,8 +809,7 @@
         return data;
       } catch (e) {
         if (retries > 0) return api(path, opts, retries - 1);
-        const isAccountDisabled = e && typeof e === 'object' && e.code === 'account_disabled';
-        if (isAccountDisabled) showAccountDisabledWarning(e.message);
+        if (isAccountDisabledError(e)) showAccountDisabledWarning(e.message);
         throw e;
       }
     }
@@ -994,7 +997,7 @@
         renderSessions();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
-        if (e && typeof e === 'object' && e.code === 'account_disabled') return;
+        if (isAccountDisabledError(e)) return;
         toast(e.message || 'Session load failed', true);
       }
     }
@@ -1010,7 +1013,7 @@
         render();
       } catch (e) {
         if (String(e.message).toLowerCase().includes('unauthorized')) return logout();
-        if (e && typeof e === 'object' && e.code === 'account_disabled') return;
+        if (isAccountDisabledError(e)) return;
         toast(e.message || 'Dashboard load failed', true);
       }
     }
