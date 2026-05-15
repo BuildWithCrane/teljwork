@@ -32,6 +32,7 @@ const ADMIN_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ADMIN_MAX_FAILED_ATTEMPTS = 8;
 const ADMIN_LOCKOUT_MS = 20 * 60 * 1000;
 const SOFT_DISABLED_USERS = new Map();
+const USER_DISABLE_COLUMNS_SUPPORT = { checked: false, available: false };
 const SESSION_STORE = new Map();
 const REVOKED_SESSION_IDS = new Set();
 const DAILY_BANDWIDTH_LIMITS = {
@@ -559,12 +560,15 @@ async function listAdminUsers(request, env) {
   const adminError = await requireAdmin(request, env);
   if (adminError) return adminError;
 
-  const users = await sbGet(env, 'users?select=id,email,storage_used,storage_cap,created_at&order=created_at.desc');
+  const persistentDisableSupported = await hasPersistentUserDisableColumns(env);
+  const select = persistentDisableSupported
+    ? 'id,email,storage_used,storage_cap,created_at,disabled,disabled_reason'
+    : 'id,email,storage_used,storage_cap,created_at';
+  const users = await sbGet(env, `users?select=${select}&order=created_at.desc`);
   return jsonOk({
     users: users.map((u) => ({
       ...u,
-      disabled: isUserSoftDisabled(u.id),
-      disabled_reason: isUserSoftDisabled(u.id) ? SOFT_DISABLED_USERS.get(String(u.id)).reason : '',
+      ...resolveDisabledStateFromUserRecord(u.id, u),
     })),
   });
 }
@@ -667,7 +671,7 @@ async function adminDisableUser(request, env) {
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
-  SOFT_DISABLED_USERS.set(String(userId), { reason, disabledAt: new Date().toISOString() });
+  await setUserDisabledState(env, userId, true, reason);
   clearSessionsForUser(userId);
   logAdminAudit(request, 'disable_user', { userId, email: users[0].email, reason });
   return jsonOk({ disabled: true, userId, reason });
@@ -681,7 +685,7 @@ async function adminRestoreUser(request, env) {
   if (!userId) return jsonError('userId is required', 400, 'missing_user_id');
   const users = await sbGet(env, `users?id=eq.${enc(userId)}&select=id,email`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
-  SOFT_DISABLED_USERS.delete(String(userId));
+  await setUserDisabledState(env, userId, false, '');
   logAdminAudit(request, 'restore_user', { userId, email: users[0].email });
   return jsonOk({ restored: true, userId });
 }
@@ -703,8 +707,7 @@ async function adminUserDetails(request, env) {
   return jsonOk({
     user: {
       ...users[0],
-      disabled: isUserSoftDisabled(userId),
-      disabled_reason: isUserSoftDisabled(userId) ? SOFT_DISABLED_USERS.get(String(userId)).reason : '',
+      ...(await getUserDisabledState(env, userId, users[0])),
     },
     details: {
       fileCount: files.length,
@@ -845,7 +848,8 @@ async function login(request, env) {
   const users = await sbGet(env, `users?email=eq.${enc(normalizedEmail)}&select=*`);
   if (!users.length || !(await verifyPassword(password, users[0].password_hash))) return jsonError('Invalid credentials', 401, 'invalid_credentials');
   const user = users[0];
-  if (isUserSoftDisabled(user.id)) return jsonError(accountDisabledMessage(user.id), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, user.id, user);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   const session = createUserSession(user.id, request);
   const token = await makeJWT({ userId: user.id, email: user.email, sid: session.id }, env.JWT_SECRET);
   return jsonOk({ token, email: user.email, storage_used: user.storage_used, storage_cap: user.storage_cap, session: session.publicView });
@@ -854,17 +858,19 @@ async function login(request, env) {
 async function getMe(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
   const users = await sbGet(env, `users?id=eq.${auth.userId}&select=*`);
   if (!users.length) return jsonError('User not found', 404, 'user_not_found');
+  const disableState = await getUserDisabledState(env, auth.userId, users[0]);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
-  return jsonOk({ ...users[0], disabled: isUserSoftDisabled(auth.userId) });
+  return jsonOk({ ...users[0], ...disableState });
 }
 
 async function listSessions(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
   const sessions = (SESSION_STORE.get(String(auth.userId)) || []).map((s) => ({
     ...s.publicView,
@@ -876,7 +882,8 @@ async function listSessions(request, env) {
 async function revokeSession(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   const body = await request.json().catch(() => ({}));
   const sessionId = String(body.sessionId || '').trim();
   if (!sessionId) return jsonError('sessionId is required', 400, 'missing_session_id');
@@ -887,7 +894,8 @@ async function revokeSession(request, env) {
 async function revokeAllSessions(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   clearSessionsForUser(auth.userId);
   return jsonOk({ revokedAll: true });
 }
@@ -1025,7 +1033,8 @@ async function fetchJsonFromApi(url, defaultErrorMessage) {
 async function verifyPayment(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
 
   const body = await request.json().catch(() => ({}));
   const userId = String(body.userId || '').trim();
@@ -1097,7 +1106,8 @@ async function verifyPayment(request, env) {
 async function uploadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
 
   const formData = await request.formData();
@@ -1181,7 +1191,8 @@ async function enforceDailyBandwidthLimit(env, userId, transferBytes) {
 async function listFiles(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
   const files = await sbGet(env, `files?user_id=eq.${auth.userId}&order=uploaded_at.desc&select=*`);
   return jsonOk({ files });
@@ -1190,7 +1201,8 @@ async function listFiles(request, env) {
 async function downloadFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
 
   const { searchParams } = new URL(request.url);
@@ -1225,7 +1237,8 @@ async function downloadFile(request, env) {
 async function viewFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
 
   const { searchParams } = new URL(request.url);
@@ -1267,7 +1280,8 @@ async function viewFile(request, env) {
 async function deleteFile(request, env) {
   const auth = await requireAuth(request, env);
   if (!auth) return jsonError('Unauthorized', 401, 'unauthorized');
-  if (isUserSoftDisabled(auth.userId)) return jsonError(accountDisabledMessage(auth.userId), 403, 'account_disabled');
+  const disableState = await getUserDisabledState(env, auth.userId);
+  if (disableState.disabled) return jsonError(accountDisabledMessage(disableState.reason), 403, 'account_disabled');
   touchSession(auth.userId, auth.sid, request);
 
   const { fileRecordId } = await request.json().catch(() => ({}));
@@ -1421,6 +1435,12 @@ function clearSessionsForUser(userId) {
   SESSION_STORE.delete(key);
 }
 
+function normalizeDisabledValue(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase());
+  return false;
+}
+
 function isUserSoftDisabled(userId) {
   return SOFT_DISABLED_USERS.has(String(userId));
 }
@@ -1429,9 +1449,59 @@ function getUserSoftDisabledReason(userId) {
   return isUserSoftDisabled(userId) ? String(SOFT_DISABLED_USERS.get(String(userId))?.reason || '').trim() : '';
 }
 
-function accountDisabledMessage(userId) {
-  const reason = getUserSoftDisabledReason(userId);
-  return reason ? `Account is temporarily disabled by admin. Reason: ${reason}` : 'Account is temporarily disabled by admin';
+function resolveDisabledStateFromUserRecord(userId, userRecord) {
+  if (userRecord && Object.prototype.hasOwnProperty.call(userRecord, 'disabled')) {
+    return {
+      disabled: normalizeDisabledValue(userRecord.disabled),
+      disabled_reason: String(userRecord.disabled_reason || '').trim(),
+    };
+  }
+  return {
+    disabled: isUserSoftDisabled(userId),
+    disabled_reason: getUserSoftDisabledReason(userId),
+  };
+}
+
+async function hasPersistentUserDisableColumns(env) {
+  if (USER_DISABLE_COLUMNS_SUPPORT.checked) return USER_DISABLE_COLUMNS_SUPPORT.available;
+  try {
+    await sbGet(env, 'users?select=disabled,disabled_reason&limit=1');
+    USER_DISABLE_COLUMNS_SUPPORT.available = true;
+  } catch {
+    USER_DISABLE_COLUMNS_SUPPORT.available = false;
+  }
+  USER_DISABLE_COLUMNS_SUPPORT.checked = true;
+  return USER_DISABLE_COLUMNS_SUPPORT.available;
+}
+
+async function getUserDisabledState(env, userId, userRecord = null) {
+  const key = String(userId);
+  if (userRecord) {
+    const fromRecord = resolveDisabledStateFromUserRecord(key, userRecord);
+    if (Object.prototype.hasOwnProperty.call(userRecord, 'disabled')) return fromRecord;
+  }
+  if (!(await hasPersistentUserDisableColumns(env))) return resolveDisabledStateFromUserRecord(key, null);
+  const users = await sbGet(env, `users?id=eq.${enc(key)}&select=disabled,disabled_reason&limit=1`);
+  if (!users.length) return { disabled: false, disabled_reason: '' };
+  return resolveDisabledStateFromUserRecord(key, users[0]);
+}
+
+async function setUserDisabledState(env, userId, disabled, reason = '') {
+  const key = String(userId);
+  const normalizedReason = String(reason || '').trim().slice(0, 200);
+  if (await hasPersistentUserDisableColumns(env)) {
+    await sbPatch(env, `users?id=eq.${enc(key)}`, { disabled: Boolean(disabled), disabled_reason: disabled ? normalizedReason : '' });
+  }
+  if (disabled) {
+    SOFT_DISABLED_USERS.set(key, { reason: normalizedReason || 'Disabled by admin', disabledAt: new Date().toISOString() });
+  } else {
+    SOFT_DISABLED_USERS.delete(key);
+  }
+}
+
+function accountDisabledMessage(reason = '') {
+  const normalizedReason = String(reason || '').trim();
+  return normalizedReason ? `Account is temporarily disabled by admin. Reason: ${normalizedReason}` : 'Account is temporarily disabled by admin';
 }
 
 function getAdminRateKey(request) {
